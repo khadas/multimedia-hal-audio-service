@@ -55,7 +55,9 @@ install:
 	install -m 755 -D audio_client_test -t $(TARGET_DIR)/usr/bin/
 	install -m 755 -D audio_client_test_ac3 $(TARGET_DIR)/usr/bin/
 	install -m 644 -D libaudio_client.so -t $(TARGET_DIR)/usr/lib/
+	install -m 644 -D libaudio_client.so -t $(STAGING_DIR)/usr/lib/
 	install -m 644 -D include/audio_if_client.h -t $(STAGING_DIR)/usr/include
+	install -m 644 -D include/audio_if.h -t $(STAGING_DIR)/usr/include
 	for f in $(@D)/include/hardware/*.h; do \
 		install -m 644 -D $${f} -t $(STAGING_DIR)/usr/include/hardware; \
 	done
