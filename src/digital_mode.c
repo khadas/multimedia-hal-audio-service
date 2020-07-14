@@ -6,7 +6,7 @@
 #define DIGITAL_MODE_DD   4
 #define DIGITAL_MODE_AUTO 5
 
-#define DIGITAL_MODE_CMD "hdmi_mode="
+#define DIGITAL_MODE_CMD "hdmi_format="
 
 int main(int argc, char **argv)
 {
