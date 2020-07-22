@@ -2,9 +2,10 @@
 #include <stdlib.h>
 #include <audio_if.h>
 
-#define DIGITAL_MODE_PCM  0
-#define DIGITAL_MODE_DD   4
-#define DIGITAL_MODE_AUTO 5
+#define DIGITAL_MODE_PCM    0
+#define DIGITAL_MODE_DD     4
+#define DIGITAL_MODE_AUTO   5
+#define DIGITAL_MODE_BYPASS 6
 
 #define DIGITAL_MODE_CMD "hdmi_format="
 
@@ -22,7 +23,8 @@ int main(int argc, char **argv)
     mode = atoi(argv[1]);
     if ((mode != DIGITAL_MODE_PCM) &&
         (mode != DIGITAL_MODE_DD) &&
-        (mode != DIGITAL_MODE_AUTO)) {
+        (mode != DIGITAL_MODE_AUTO) &&
+        (mode != DIGITAL_MODE_BYPASS)) {
         printf("Invalid mode\n");
         return -2;
     }
