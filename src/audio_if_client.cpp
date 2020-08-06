@@ -473,7 +473,7 @@ int audio_hw_load_interface(audio_hw_device_t **dev)
   }
 
   client = new AudioClient(
-    grpc::CreateChannel("localhost:50051",
+    grpc::CreateChannel("unix:///vendor/lib/audio_socket",
                         grpc::InsecureChannelCredentials()));
 
   *dev = &device;

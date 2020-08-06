@@ -808,7 +808,7 @@ std::mutex AudioServiceImpl::map_in_mutex_;
 
 void RunServer(managed_shared_memory& shm)
 {
-  std::string server_address("0.0.0.0:50051");
+  std::string server_address("unix:///vendor/lib/audio_socket");
   AudioServiceImpl service(shm);
 
   ServerBuilder builder;
