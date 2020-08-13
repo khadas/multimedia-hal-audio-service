@@ -26,7 +26,8 @@ GRPC_CPP_PLUGIN_PATH=$(HOST_DIR)/bin/grpc_cpp_plugin
 
 CFLAGS+=-fPIC -O2 -I$(PROTOC_INC) -I./include -I. -I./src
 CXXFLAGS+=-std=c++14
-LDFLAGS+=-lgrpc++_unsecure -lprotobuf -lboost_system -llog -ldl -lrt -lpthread -lstdc++
+SC_LDFLAGS+=-lgrpc++_unsecure -lprotobuf -lboost_system -llog -ldl -lrt -lpthread -lstdc++
+LDFLAGS+=-llog -ldl -lrt -lpthread -lstdc++
 
 %.grpc.pb.cc: %.proto
 	$(PROTOC) -I=. -I=$(PROTOC_INC) --grpc_out=. --plugin=protoc-gen-grpc=$(GRPC_CPP_PLUGIN_PATH) $<
@@ -46,10 +47,10 @@ LDFLAGS+=-lgrpc++_unsecure -lprotobuf -lboost_system -llog -ldl -lrt -lpthread -
 all: audio_server libaudio_client.so audio_client_test audio_client_test_ac3 halplay dap_setting speaker_delay digital_mode test_arc start_arc hal_param master_vol
 
 audio_server: $(SERVER_OBJS)
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) $(SC_LDFLAGS) -o $@ $^
 
 libaudio_client.so: $(CLIENT_OBJS)
-	$(CC) $(CFLAGS) $(LDFLAGS) -shared -o $@ $^
+	$(CC) $(CFLAGS) $(SC_LDFLAGS) -shared -o $@ $^
 
 audio_client_test: $(TEST_PCM_OBJS) libaudio_client.so
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
