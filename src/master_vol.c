@@ -9,8 +9,9 @@ int main(int argc, char **argv)
     float vol;
     char cmd[256];
 
-    if (argc < 2) {
-        printf("Usage: master_vol <volume: 0.0-1.0>\n");
+    if (argc < 3) {
+        printf("Usage set volume             : master_vol s <volume: 0.0-1.0>\n");
+        printf("      set master mute/unmute : master_vol m <0, 1>\n");
         return -1;
     }
 
@@ -33,8 +34,21 @@ int main(int argc, char **argv)
         return -1;
     }
 
-    ret = device->set_master_volume(device, vol);
-    printf("Volume %f set\n", vol);
+    if (argv[1][0] == 's') {
+        vol = atof(argv[2]);
+        if ((vol < 0) || (vol > 1.0)) {
+            printf("Volume must be between [0.0, 1.0]\n");
+            audio_hw_unload_interface(device);
+            return -1;
+        }
+        ret = device->set_master_volume(device, vol);
+        printf("Volume %f set\n", vol);
+    } else if (argv[1][0] == 'm') {
+        ret = device->set_master_mute(device, atoi(argv[2]) == 1);
+    } else {
+        printf("Invalid command, use 's' or 'm' command.\n");
+        ret = -2;
+    }
 
     audio_hw_unload_interface(device);
 
