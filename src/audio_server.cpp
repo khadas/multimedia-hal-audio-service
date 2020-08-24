@@ -808,9 +808,12 @@ std::mutex AudioServiceImpl::map_in_mutex_;
 
 void RunServer(managed_shared_memory& shm)
 {
-  std::string server_address("unix:///vendor/lib/audio_socket");
+  const char *url = std::getenv("AUDIO_SERVER_SOCKET");
+  std::string server_address("unix:///opt/audio_socket");
   AudioServiceImpl service(shm);
-
+  if (url) {
+      server_address = url;
+  }
   ServerBuilder builder;
   builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
   builder.RegisterService(&service);

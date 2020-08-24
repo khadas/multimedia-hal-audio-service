@@ -465,6 +465,8 @@ int audio_hw_load_interface(audio_hw_device_t **dev)
   TRACE_ENTRY();
   printf("PID = %d, inited = %d\n", ::getpid(), inited);
 
+  const char *url = std::getenv("AUDIO_SERVER_SOCKET");
+
   std::lock_guard<std::mutex> lock(client_mutex);
 
   if (inited++ > 0) {
@@ -473,7 +475,7 @@ int audio_hw_load_interface(audio_hw_device_t **dev)
   }
 
   client = new AudioClient(
-    grpc::CreateChannel("unix:///vendor/lib/audio_socket",
+    grpc::CreateChannel((url) ? url : "unix:///opt/audio_socket",
                         grpc::InsecureChannelCredentials()));
 
   *dev = &device;
