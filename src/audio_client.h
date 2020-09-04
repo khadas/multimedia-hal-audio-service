@@ -15,6 +15,7 @@
 #include <grpcpp/client_context.h>
 #include <grpcpp/create_channel.h>
 #include <grpcpp/security/credentials.h>
+#include "audio_effect_if.h"
 #include "audio_service.grpc.pb.h"
 
 using grpc::Channel;
@@ -154,6 +155,8 @@ class AudioClient {
     int stream_set_parameters(struct audio_stream *stream, const char *kv_pairs);
     char * stream_get_parameters(const struct audio_stream *stream,
                       const char *keys);
+    int Effect_set_parameters(aml_audio_effect_type_e type, effect_param_t *param);
+    int Effect_get_parameters(aml_audio_effect_type_e type, effect_param_t *param);
 
     const int kSharedBufferSize = 256 * 1024;
 

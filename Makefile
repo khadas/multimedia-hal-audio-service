@@ -20,6 +20,7 @@ TEST_START_ARC_OBJS=src/start_arc.o
 TEST_HAL_PARAM_OBJS=src/hal_param.o
 TEST_HAL_DUMP_OBJS=src/hal_dump.o
 TEST_MASTER_VOL_OBJS=src/master_vol.o
+EFFECT_TOOL_OBJS=src/effect_tool.o
 
 PROTOC=$(HOST_DIR)/bin/protoc
 PROTOC_INC=$(HOST_DIR)/include
@@ -48,7 +49,7 @@ LDFLAGS+=-llog -ldl -lrt -lpthread -lstdc++
 %.o: %.c
 	$(CC) -c $(CFLAGS) -o $@ $<
 
-all: audio_server libaudio_client.so audio_client_test audio_client_test_ac3 halplay dap_setting speaker_delay digital_mode test_arc start_arc hal_param hal_dump master_vol
+all: audio_server libaudio_client.so audio_client_test audio_client_test_ac3 halplay dap_setting speaker_delay digital_mode test_arc start_arc hal_param hal_dump master_vol effect_tool
 
 audio_server: $(SERVER_OBJS)
 	$(CC) $(CFLAGS) $(SC_LDFLAGS) -o $@ $^
@@ -89,6 +90,9 @@ hal_dump: $(TEST_HAL_DUMP_OBJS) libaudio_client.so
 master_vol: $(TEST_MASTER_VOL_OBJS) libaudio_client.so
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
 
+effect_tool: $(EFFECT_TOOL_OBJS) libaudio_client.so
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
+
 .PHONY: install
 install:
 	install -m 755 -D audio_server -t $(TARGET_DIR)/usr/bin/
@@ -103,10 +107,12 @@ install:
 	install -m 755 -D hal_param $(TARGET_DIR)/usr/bin/
 	install -m 755 -D hal_dump $(TARGET_DIR)/usr/bin/
 	install -m 755 -D master_vol $(TARGET_DIR)/usr/bin/
+	install -m 755 -D effect_tool $(TARGET_DIR)/usr/bin/
 	install -m 644 -D libaudio_client.so -t $(TARGET_DIR)/usr/lib/
 	install -m 644 -D libaudio_client.so -t $(STAGING_DIR)/usr/lib/
 	install -m 644 -D include/audio_if_client.h -t $(STAGING_DIR)/usr/include
 	install -m 644 -D include/audio_if.h -t $(STAGING_DIR)/usr/include
+	install -m 644 -D include/audio_effect_if.h -t $(STAGING_DIR)/usr/include
 	for f in $(@D)/include/hardware/*.h; do \
 		install -m 644 -D $${f} -t $(STAGING_DIR)/usr/include/hardware; \
 	done
@@ -125,6 +131,7 @@ clean:
 	rm -f hal_param
 	rm -f hal_dump
 	rm -f master_vol
+	rm -f effect_tool
 	rm -rf $(STAGING_DIR)/usr/include/hardware
 	rm -rf $(STAGING_DIR)/usr/include/system
 	rm -f libaudio_client.so
@@ -139,7 +146,9 @@ clean:
 	rm -f $(TARGET_DIR)/usr/bin/hal_param
 	rm -f $(TARGET_DIR)/usr/bin/hal_dump
 	rm -f $(TARGET_DIR)/usr/bin/master_vol
+	rm -f $(TARGET_DIR)/usr/bin/effect_tool
 	rm -f $(TARGET_DIR)/usr/lib/libaudio_client.so
 	rm -f $(STAGING_DIR)/usr/lib/libaudio_client.so
 	rm -f $(STAGING_DIR)/usr/include/audio_if_client.h
+	rm -f $(STAGING_DIR)/usr/include/audio_effect_if.h
 

@@ -496,4 +496,36 @@ void audio_hw_unload_interface(audio_hw_device_t *dev)
   }
 }
 
+int audio_effect_set_parameters(aml_audio_effect_type_e type, effect_param_t *param)
+{
+  TRACE_ENTRY();
+
+  std::lock_guard<std::mutex> lock(client_mutex);
+
+  if (type >= AML_EFFECT_MAX || type < 0)
+    return -1;
+
+  if (param == NULL || param->psize == 0 || param->vsize == 0) {
+    return -1;
+  }
+
+  return client->Effect_set_parameters(type, param);
+}
+
+int audio_effect_get_parameters(aml_audio_effect_type_e type, effect_param_t *param)
+{
+  TRACE_ENTRY();
+
+  std::lock_guard<std::mutex> lock(client_mutex);
+
+  if (type >= AML_EFFECT_MAX || type < 0)
+    return -1;
+
+  if (param == NULL || param->psize == 0 || param->vsize == 0) {
+    return -1;
+  }
+
+  return client->Effect_get_parameters(type, param);
+}
+
 }

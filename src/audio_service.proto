@@ -378,6 +378,13 @@ service AudioService {
   // Misc API
   ////////////////////////////
   rpc Service_ping(google.protobuf.Empty) returns (StatusReturn) {}
+
+  ////////////////////////////
+  // Effect API
+  ////////////////////////////
+  // set/get audio effect parameters.
+  rpc Effect_set_parameters(EffectParameters) returns (StatusReturn) {}
+  rpc Effect_get_parameters(EffectParameters) returns (StatusReturn) {}
 }
 
 message StatusReturn {
@@ -388,6 +395,7 @@ message StatusReturn {
     int64 status_64 = 4;
     float status_float = 5;
     string status_string = 6;
+    bytes status_bytes = 7;
   }
 }
 
@@ -537,4 +545,12 @@ message GetCapturePositionReturn {
   int32 ret = 1;
   uint64 frames = 2;
   uint64 time = 3;
+}
+
+message EffectParameters {
+  uint32 type = 1;
+  uint32 cmd_size = 2;
+  bytes cmd_data = 3;
+  uint32 reply_size = 4;
+  bytes reply_data = 5;
 }

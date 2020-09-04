@@ -183,6 +183,32 @@ StreamGetParameters MakeStreamGetParameters(char *name, const char *keys)
   return p;
 }
 
+EffectParameters MakeEffectSetParameters(int type, effect_param_t *param)
+{
+  EffectParameters p;
+  uint32_t psize = ((param->psize - 1) / sizeof(int) + 1) * sizeof(int) + param->vsize;
+
+  p.set_type(type);
+  p.set_cmd_size(sizeof (effect_param_t) + psize);
+  p.set_cmd_data(param, sizeof (effect_param_t) + psize);
+  p.set_reply_size(sizeof(int));
+  return p;
+}
+
+EffectParameters MakeEffectGetParameters(int type, effect_param_t *param)
+{
+  EffectParameters p;
+  uint32_t psize = sizeof(effect_param_t) + ((param->psize - 1) / sizeof(int) + 1) * sizeof(int)
+                         + param->vsize;
+
+  p.set_type(type);
+  p.set_cmd_size(sizeof (effect_param_t) + param->psize);
+  p.set_cmd_data(param, sizeof (effect_param_t) + param->psize);
+  p.set_reply_size(psize);
+  return p;
+}
+
+
 std::atomic_int AudioClient::stream_seq_;
 
 int AudioClient::Device_common_close(struct hw_device_t* device)
@@ -689,3 +715,24 @@ char * AudioClient::stream_get_parameters(const struct audio_stream *stream,
   }
   return p;
 }
+
+int AudioClient::Effect_set_parameters(aml_audio_effect_type_e type, effect_param_t *param)
+{
+  TRACE_ENTRY();
+  ClientContext context;
+  StatusReturn r;
+  Status status = stub_->Effect_set_parameters(&context, MakeEffectSetParameters(type, param), &r);
+  param->status = r.status_32();
+  return r.ret();
+}
+
+int AudioClient::Effect_get_parameters(aml_audio_effect_type_e type, effect_param_t *param)
+{
+  TRACE_ENTRY();
+  ClientContext context;
+  StatusReturn r;
+  Status status = stub_->Effect_get_parameters(&context, MakeEffectGetParameters(type, param), &r);
+  memcpy(param, r.status_bytes().data(), r.status_bytes().size());
+  return r.ret();
+}
+

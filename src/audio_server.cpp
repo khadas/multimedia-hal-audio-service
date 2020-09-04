@@ -20,6 +20,7 @@
 #include "audio_if.h"
 #include "audio_service.grpc.pb.h"
 #include "CircularBuffer.h"
+#include "audio_effect_if.h"
 
 using grpc::Server;
 using grpc::ServerBuilder;
@@ -51,6 +52,7 @@ using audio_service::StreamOutSetVolume;
 using audio_service::StreamReadWrite;
 using audio_service::GetFrameTimestampReturn;
 using audio_service::StreamGain;
+using audio_service::EffectParameters;
 using google::protobuf::Empty;
 
 using namespace boost::interprocess;
@@ -77,12 +79,18 @@ class AudioServiceImpl final : public AudioService::Service
     explicit AudioServiceImpl(managed_shared_memory &shm)
       : shm_(shm) {
         if (audio_hw_load_interface(&dev_) == 0) {
+          if (dev_) {
+            effect_ = (audio_effect_t *)dev_->common.reserved[0];
+          }
           //ALOGI(__func__, "[AudioServer] Get audio hal interface successfully.\n");
         }
       }
 
     ~AudioServiceImpl() {
       if (dev_) {
+        if (effect_) {
+          effect_ = nullptr;
+        }
         audio_hw_unload_interface(dev_);
         dev_ = nullptr;
       }
@@ -701,6 +709,38 @@ class AudioServiceImpl final : public AudioService::Service
       return Status::OK;
     }
 
+    Status Effect_set_parameters(ServerContext* context, const EffectParameters* request, StatusReturn* response) {
+      TRACE_ENTRY();
+      if (!dev_ || !effect_) return Status::CANCELLED;
+
+      aml_audio_effect_type_e type = (aml_audio_effect_type_e)request->type();
+      uint32_t cmdSize = request->cmd_size();
+      void *pCmdData = (void *)request->cmd_data().data();
+      uint32_t replySize = request->reply_size();
+      uint32_t pReplyData = 0;
+
+      response->set_ret(effect_->set_parameters(type, cmdSize, pCmdData, &replySize, &pReplyData));
+      response->set_status_32(pReplyData);
+      return Status::OK;
+    }
+
+    Status Effect_get_parameters(ServerContext* context, const EffectParameters* request, StatusReturn* response) {
+      TRACE_ENTRY();
+      if (!dev_ || !effect_) return Status::CANCELLED;
+
+      aml_audio_effect_type_e type = (aml_audio_effect_type_e)request->type();
+      uint32_t cmdSize = request->cmd_size();
+      void *pCmdData = (void *)request->cmd_data().data();
+      uint32_t replySize = request->reply_size();
+      void * pReplyData = malloc(replySize);
+
+      response->set_ret(effect_->get_parameters(type, cmdSize, pCmdData, &replySize, pReplyData));
+      response->set_status_bytes(pReplyData, replySize);
+      free(pReplyData);
+      pReplyData = nullptr;
+      return Status::OK;
+    }
+
   private:
     void streamout_gc_()
     {
@@ -801,6 +841,7 @@ class AudioServiceImpl final : public AudioService::Service
 
     /* audio hal interface */
     struct audio_hw_device *dev_;
+    audio_effect_t *effect_;
     static std::mutex map_in_mutex_;
     static std::mutex map_out_mutex_;
     std::map<const std::string, streamout_map_t > streamout_map_;
