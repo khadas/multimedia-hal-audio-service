@@ -114,6 +114,8 @@ static int test_stream(struct audio_stream_out *stream)
 {
     int ret;
     int i;
+    size_t buffer_size;
+
     printf("%s %d, ch_mask:%x\n",
             __func__, __LINE__,
             stream->common.get_channels(&stream->common));
@@ -123,6 +125,12 @@ static int test_stream(struct audio_stream_out *stream)
     printf("%s %d, sr:%d\n",
             __func__, __LINE__,
             stream->common.get_sample_rate(&stream->common));
+
+    buffer_size = stream->common.get_buffer_size(&stream->common);
+    printf("%s %d, buffer_size:%d\n",
+            __func__, __LINE__,
+            buffer_size);
+
     ret = stream->common.standby(&stream->common);
     if (ret) {
         printf("%s %d, ret:%x\n",
@@ -139,9 +147,21 @@ static int test_stream(struct audio_stream_out *stream)
     stream->resume(stream);
 
     for (i = 0; i < 20; i++) {
-        ssize_t s = stream->write(stream, wav_data, sizeof(wav_data));
-        printf("%s %d, write %d bytes\n", __func__, __LINE__, s);
-        uint32_t latency = stream->get_latency(stream);
+        int offset = 0;
+        int wr_unit = buffer_size * 4;
+        uint32_t latency;
+
+        while (offset < sizeof(wav_data)) {
+            int remain = sizeof(wav_data) - offset;
+            if (remain > wr_unit)
+                remain = wr_unit;
+            size_t s = stream->write(stream, &wav_data[offset], remain);
+            if (s < 0)
+                break;
+            offset += s;
+        }
+        printf("%s %d, write %d bytes\n", __func__, __LINE__, sizeof(wav_data));
+        latency = stream->get_latency(stream);
         printf("%s %d, write %d latency\n", __func__, __LINE__, latency);
     }
 
