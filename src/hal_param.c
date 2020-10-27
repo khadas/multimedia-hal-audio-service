@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <audio_if.h>
 
 int main(int argc, char **argv)
@@ -6,8 +7,8 @@ int main(int argc, char **argv)
     audio_hw_device_t *device;
     int ret = audio_hw_load_interface(&device);
 
-    if (argc < 2) {
-        printf("Usage: hal_param <param string (kvpair)>\n");
+    if (argc < 3) {
+        printf("Usage: hal_param <get/set> <param string (kvpair)>\n");
         return -1;
     }
 
@@ -23,11 +24,25 @@ int main(int argc, char **argv)
         return -1;
     }
 
-    ret = device->set_parameters(device, argv[1]);
+    if (strcmp(argv[1], "get") == 0) {
+        char *param = device->get_parameters(device, argv[2]);
+        if (param) {
+           printf("%s\n", param);
+           free(param);
+        }
+    } else if (strcmp(argv[1], "set") == 0) {
+        ret = device->set_parameters(device, argv[2]);
+        if (!ret) {
+            printf("Parameters sent to Audio HAL.\n");
+        }
+    } else {
+        ret = device->set_parameters(device, argv[1]);
+        if (!ret) {
+            printf("Parameters sent to Audio HAL.\n");
+        }
+    }
 
     audio_hw_unload_interface(device);
-
-    printf("Parameters sent to Audio HAL.\n");
 
     return ret;
 }
