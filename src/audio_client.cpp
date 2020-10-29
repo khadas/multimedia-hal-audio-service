@@ -358,14 +358,17 @@ void AudioClient::Device_close_input_stream(struct audio_hw_device *dev,
   Status status = stub_->Device_close_input_stream(&context, MakeStream(std::string(in->name)), &r);
 }
 
-int AudioClient::Device_dump(const struct audio_hw_device *dev, int fd)
+char *AudioClient::Device_dump(const struct audio_hw_device *dev, int fd)
 {
   TRACE_ENTRY();
   ClientContext context;
   StatusReturn r;
   Status status = stub_->Device_dump(&context, Empty(), &r);
-  write(fd, r.status_string().c_str(), r.status_string().size());
-  return r.ret();
+  char *p = (char *)malloc(r.status_string().size() + 1);
+  if (p) {
+    strcpy(p, r.status_string().c_str());
+  }
+  return p;
 }
 
 int AudioClient::Device_set_master_mute(struct audio_hw_device *dev, bool mute)

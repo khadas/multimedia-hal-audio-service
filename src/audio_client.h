@@ -106,7 +106,7 @@ class AudioClient {
                                  audio_source_t source);
     void Device_close_input_stream(struct audio_hw_device *dev,
                                    struct audio_stream_in *stream_in);
-    int Device_dump(const struct audio_hw_device *dev, int fd);
+    char * Device_dump(const struct audio_hw_device *dev, int fd);
     int Device_set_master_mute(struct audio_hw_device *dev, bool mute);
     int Device_get_master_mute(struct audio_hw_device *dev, bool *mute);
     int Device_create_audio_patch(struct audio_hw_device *dev,

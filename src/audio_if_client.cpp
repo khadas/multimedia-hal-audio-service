@@ -367,7 +367,7 @@ static void Device_close_input_stream(struct audio_hw_device *dev,
   free(audio_stream_in_to_client(stream_in));
 }
 
-static int Device_dump(const struct audio_hw_device *dev, int fd)
+static char * Device_dump(const struct audio_hw_device *dev, int fd)
 {
   TRACE_ENTRY();
 

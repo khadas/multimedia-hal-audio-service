@@ -18,6 +18,7 @@ TEST_DIGITAL_MODE_OBJS=src/digital_mode.o
 TEST_ARC_TEST_OBJS=src/test_arc.o
 TEST_START_ARC_OBJS=src/start_arc.o
 TEST_HAL_PARAM_OBJS=src/hal_param.o
+TEST_HAL_DUMP_OBJS=src/hal_dump.o
 TEST_MASTER_VOL_OBJS=src/master_vol.o
 
 PROTOC=$(HOST_DIR)/bin/protoc
@@ -47,7 +48,7 @@ LDFLAGS+=-llog -ldl -lrt -lpthread -lstdc++
 %.o: %.c
 	$(CC) -c $(CFLAGS) -o $@ $<
 
-all: audio_server libaudio_client.so audio_client_test audio_client_test_ac3 halplay dap_setting speaker_delay digital_mode test_arc start_arc hal_param master_vol
+all: audio_server libaudio_client.so audio_client_test audio_client_test_ac3 halplay dap_setting speaker_delay digital_mode test_arc start_arc hal_param hal_dump master_vol
 
 audio_server: $(SERVER_OBJS)
 	$(CC) $(CFLAGS) $(SC_LDFLAGS) -o $@ $^
@@ -82,6 +83,9 @@ start_arc: $(TEST_START_ARC_OBJS)
 hal_param: $(TEST_HAL_PARAM_OBJS) libaudio_client.so
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
 
+hal_dump: $(TEST_HAL_DUMP_OBJS) libaudio_client.so
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
+
 master_vol: $(TEST_MASTER_VOL_OBJS) libaudio_client.so
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
 
@@ -97,6 +101,7 @@ install:
 	install -m 755 -D test_arc $(TARGET_DIR)/usr/bin/
 	install -m 755 -D start_arc $(TARGET_DIR)/usr/bin/
 	install -m 755 -D hal_param $(TARGET_DIR)/usr/bin/
+	install -m 755 -D hal_dump $(TARGET_DIR)/usr/bin/
 	install -m 755 -D master_vol $(TARGET_DIR)/usr/bin/
 	install -m 644 -D libaudio_client.so -t $(TARGET_DIR)/usr/lib/
 	install -m 644 -D libaudio_client.so -t $(STAGING_DIR)/usr/lib/
@@ -118,6 +123,7 @@ clean:
 	rm -f test_arc
 	rm -f start_arc
 	rm -f hal_param
+	rm -f hal_dump
 	rm -f master_vol
 	rm -rf $(STAGING_DIR)/usr/include/hardware
 	rm -rf $(STAGING_DIR)/usr/include/system
@@ -131,6 +137,7 @@ clean:
 	rm -f $(TARGET_DIR)/usr/bin/test_arc
 	rm -f $(TARGET_DIR)/usr/bin/start_arc
 	rm -f $(TARGET_DIR)/usr/bin/hal_param
+	rm -f $(TARGET_DIR)/usr/bin/hal_dump
 	rm -f $(TARGET_DIR)/usr/bin/master_vol
 	rm -f $(TARGET_DIR)/usr/lib/libaudio_client.so
 	rm -f $(STAGING_DIR)/usr/lib/libaudio_client.so

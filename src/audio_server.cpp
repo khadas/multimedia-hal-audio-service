@@ -305,9 +305,13 @@ class AudioServiceImpl final : public AudioService::Service
       TRACE_ENTRY();
       if (!dev_) return Status::CANCELLED;
 
-      response->set_ret(0);
-      // TODO: dump server status
-      response->set_status_string(std::string("dump"));
+      char *param = dev_->dump(dev_, 0);
+      response->set_ret(param ? 0 : -1);
+      response->set_status_string(std::string(param));
+
+      // param is heap allocated and need free
+      free(param);
+
       return Status::OK;
     }
 
