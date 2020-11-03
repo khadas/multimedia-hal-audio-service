@@ -82,14 +82,14 @@ static void test_output_stream(audio_hw_device_t *device)
     struct audio_stream_out *stream;
 
     memset(&config, 0, sizeof(config));
-    config.sample_rate = 48000;
+    config.sample_rate = 44100;
     config.channel_mask = AUDIO_CHANNEL_OUT_5POINT1;
     config.format = AUDIO_FORMAT_AC3;
 
     printf("open output speaker...\n");
     ret = device->open_output_stream(device,
             0, AUDIO_DEVICE_OUT_SPEAKER,
-            AUDIO_OUTPUT_FLAG_PRIMARY, &config,
+            AUDIO_OUTPUT_FLAG_DIRECT, &config,
             &stream, NULL);
     if (ret) {
         printf("fail\n");

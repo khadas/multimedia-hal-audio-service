@@ -170,8 +170,6 @@ static int test_stream(struct audio_stream_out *stream)
     return 0;
 }
 
-#define HDMI_ARC_OUTPUT_DD
-
 static void test_output_stream(audio_hw_device_t *device)
 {
     int ret;
@@ -190,29 +188,12 @@ static void test_output_stream(audio_hw_device_t *device)
         fprintf(stderr, "set_parameters HDMI connected failed\n");
     }
 
-#ifdef HDMI_ARC_OUTPUT_DD
-    printf("Set HDMI ARC output format to AC3\n");
-    ret = device->set_parameters(device, "hdmi_format=4");
-    if (ret) {
-        fprintf(stderr, "set_parameters failed\n");
-    }
-#else
-    printf("Set HDMI ARC output format to PCM\n");
-    ret = device->set_parameters(device, "hdmi_format=0");
-    if (ret) {
-        fprintf(stderr, "set_parameters failed\n");
-    }
-#endif
-
-#ifdef HDMI_ARC_OUTPUT_DD
     /*
      * The following set_parameters calling sequence is needed
      * to meet the audio HAL internal checking for ARC output:
      * 1. "HDMI ARC Switch" key is used for UI control switch to enable
      *    ARC output.
      * 2. "connect" key is used to tell audio HAL the connection status
-     * 3. "speaker_mute" is also checked to make sure ARC output is
-     *    effective.
      */
     printf("Report UI settings for HDMI ARC enabled\n");
     ret = device->set_parameters(device, "HDMI ARC Switch=1");
@@ -226,13 +207,6 @@ static void test_output_stream(audio_hw_device_t *device)
     if (ret) {
         fprintf(stderr, "set_parameters failed\n");
     }
-
-    printf("Mute speaker output\n");
-    ret = device->set_parameters(device, "speaker_mute=1");
-    if (ret) {
-        fprintf(stderr, "set_parameters failed\n");
-    }
-#endif
 
     printf("open output to HDMI_ARC with direct mode...\n");
     ret = device->open_output_stream(device,
@@ -319,6 +293,11 @@ int main(int argc, char *argv[])
     int ret=0;
     audio_hw_device_t *device;
     int test_earc = 0;
+
+    printf("Usage:\n");
+    printf(" test_arc   : start ARC handshaking with CEC and then play a tone.\n");
+    printf(" test_arc 1 : set parameter 1 to do eARC playback w/o CEC communications.\n");
+    printf(" Output format can be set by digital_mode command.\n");
 
     if (argc > 1) {
         test_earc = atoi(argv[1]);
