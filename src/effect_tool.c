@@ -18,6 +18,7 @@
 #include <unistd.h>
 #include "audio_if_client.h"
 #include "audio_effect_if.h"
+#include "audio_effect_params.h"
 
 #ifdef LOG
 #undef LOG

@@ -113,6 +113,7 @@ install:
 	install -m 644 -D include/audio_if_client.h -t $(STAGING_DIR)/usr/include
 	install -m 644 -D include/audio_if.h -t $(STAGING_DIR)/usr/include
 	install -m 644 -D include/audio_effect_if.h -t $(STAGING_DIR)/usr/include
+	install -m 644 -D include/audio_effect_params.h -t $(STAGING_DIR)/usr/include
 	for f in $(@D)/include/hardware/*.h; do \
 		install -m 644 -D $${f} -t $(STAGING_DIR)/usr/include/hardware; \
 	done
@@ -151,4 +152,5 @@ clean:
 	rm -f $(STAGING_DIR)/usr/lib/libaudio_client.so
 	rm -f $(STAGING_DIR)/usr/include/audio_if_client.h
 	rm -f $(STAGING_DIR)/usr/include/audio_effect_if.h
+	rm -f $(STAGING_DIR)/usr/include/audio_effect_params.h
 
