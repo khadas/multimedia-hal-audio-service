@@ -28,16 +28,14 @@
 #define FORMAT_PCM16    0
 #define FORMAT_PCM32    1
 #define FORMAT_DD       2
-#define FORMAT_DDP      3
-#define FORMAT_MAT      4
-#define FORMAT_IEC61937 5
-#define FORMAT_AC4      6
-#define FORMAT_DTS      7
-#define FORMAT_MAX      8
+#define FORMAT_MAT      3
+#define FORMAT_IEC61937 4
+#define FORMAT_AC4      5
+#define FORMAT_MAX      6
 
-static int format_tab[] = {AUDIO_FORMAT_PCM_16_BIT, AUDIO_FORMAT_PCM_32_BIT, AUDIO_FORMAT_AC3, AUDIO_FORMAT_E_AC3, AUDIO_FORMAT_MAT, AUDIO_FORMAT_IEC61937, AUDIO_FORMAT_AC4, AUDIO_FORMAT_DTS};
+static int format_tab[] = {AUDIO_FORMAT_PCM_16_BIT, AUDIO_FORMAT_PCM_32_BIT, AUDIO_FORMAT_AC3, AUDIO_FORMAT_MAT, AUDIO_FORMAT_IEC61937, AUDIO_FORMAT_AC4};
 static const char *format_str[] = {
-    "PCM_16", "PCM_32", "DOLBY DD", "DOLBY DD+", "DOLBY MAT", "IEC_61937", "AC4", "DTS"
+    "PCM_16", "PCM_32", "DOLBY DD/DD+", "DOLBY MAT", "IEC_61937", "AC4"
 };
 
 static int format_is_pcm(int format)
@@ -138,7 +136,6 @@ int main(int argc, char **argv)
 
     if (argc == 1) {
         printf("Usage: halplay -f <format> -c <channel number> -r <sample rate> <filename>\n");
-        printf("       format : 0-PCM_16, 1-PCM_32, 2-DD, 3-DDP, 4-MAT, 5-IEC_61937, 6-AC4, 7-DTS\n");
         return 0;
     }
 
