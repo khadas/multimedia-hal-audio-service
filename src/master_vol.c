@@ -2,6 +2,13 @@
 #include <stdlib.h>
 #include <audio_if.h>
 
+static void usage()
+{
+    printf("Usage set volume             : master_vol s <volume: 0.0-1.0>\n");
+    printf("      get volume             : master_vol g\n");
+    printf("      set master mute/unmute : master_vol m <0, 1>\n");
+}
+
 int main(int argc, char **argv)
 {
     audio_hw_device_t *device;
@@ -9,15 +16,8 @@ int main(int argc, char **argv)
     float vol;
     char cmd[256];
 
-    if (argc < 3) {
-        printf("Usage set volume             : master_vol s <volume: 0.0-1.0>\n");
-        printf("      set master mute/unmute : master_vol m <0, 1>\n");
-        return -1;
-    }
-
-    vol = atof(argv[1]);
-    if ((vol < 0) || (vol > 1.0)) {
-        printf("Volume must be between [0.0, 1.0]\n");
+    if (argc < 2) {
+        usage();
         return -1;
     }
 
@@ -35,6 +35,11 @@ int main(int argc, char **argv)
     }
 
     if (argv[1][0] == 's') {
+        if (argc < 3) {
+            usage();
+            return -1;
+        }
+
         vol = atof(argv[2]);
         if ((vol < 0) || (vol > 1.0)) {
             printf("Volume must be between [0.0, 1.0]\n");
@@ -44,7 +49,17 @@ int main(int argc, char **argv)
         ret = device->set_master_volume(device, vol);
         printf("Volume %f set\n", vol);
     } else if (argv[1][0] == 'm') {
+        if (argc < 3) {
+            usage();
+            return -1;
+        }
+
         ret = device->set_master_mute(device, atoi(argv[2]) == 1);
+    } else if (argv[1][0] == 'g') {
+        ret = device->get_master_volume(device, &vol);
+        if (ret == 0) {
+            printf("Master volume: %f\n", vol);
+        }
     } else {
         printf("Invalid command, use 's' or 'm' command.\n");
         ret = -2;
