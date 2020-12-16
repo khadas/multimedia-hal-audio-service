@@ -7,6 +7,9 @@
 #include <cstdlib>
 #include <iomanip>
 #include <mutex>
+#include <chrono>
+#include <condition_variable>
+#include <thread>
 #include <signal.h>
 
 #define LOG_TAG "audio_server"
@@ -77,7 +80,16 @@ class AudioServiceImpl final : public AudioService::Service
 {
   public:
     explicit AudioServiceImpl(managed_shared_memory &shm)
-      : shm_(shm) {
+      : shm_(shm),
+        gc_runner_(std::thread([this] {
+          while (!gc_runner_stop_) {
+            streamout_gc_();
+            streamin_gc_();
+
+            std::unique_lock<std::mutex> lock(gc_mutex_);
+            gc_cv_.wait_for(lock, std::chrono::milliseconds(500), [this]() { return gc_runner_stop_; });
+          }
+        })) {
         if (audio_hw_load_interface(&dev_) == 0) {
           if (dev_) {
             effect_ = (audio_effect_t *)dev_->common.reserved[0];
@@ -87,6 +99,12 @@ class AudioServiceImpl final : public AudioService::Service
       }
 
     ~AudioServiceImpl() {
+      {
+        std::lock_guard<std::mutex> lock(gc_mutex_);
+        gc_runner_stop_ = true;
+      }
+      gc_cv_.notify_one();
+      gc_runner_.join();
       if (dev_) {
         if (effect_) {
           effect_ = nullptr;
@@ -750,7 +768,6 @@ class AudioServiceImpl final : public AudioService::Service
           bool need_close = false;
 
           if (sscanf(it->first.c_str(), "%d-%d", &pid, &seq) == 2) {
-            printf("!!!! found pid = %d\n", pid);
             // Garbage collect streams when PID does not exists.
             // It happens when client side crashed, or the client
             // side does not have the right sequence to close opened streams.
@@ -759,6 +776,7 @@ class AudioServiceImpl final : public AudioService::Service
             }
           }
           if (need_close) {
+            ALOGI("Close disconnected output stream from PID %d", pid);
             dev_->close_output_stream(dev_, it->second.second);
             if (it->second.first) {
               shm_.destroy<CircularBuffer>(it->first.c_str());
@@ -846,6 +864,12 @@ class AudioServiceImpl final : public AudioService::Service
     static std::mutex map_out_mutex_;
     std::map<const std::string, streamout_map_t > streamout_map_;
     std::map<const std::string, streamin_map_t > streamin_map_;
+
+    /* gc thread to close dead streams */
+    bool gc_runner_stop_;
+    std::mutex gc_mutex_;
+    std::condition_variable gc_cv_;
+    std::thread gc_runner_;
 };
 
 std::mutex AudioServiceImpl::map_out_mutex_;
