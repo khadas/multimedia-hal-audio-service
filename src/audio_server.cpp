@@ -1,3 +1,5 @@
+#include <stdio.h>
+#include <execinfo.h>
 #include <sys/types.h>
 #include <unistd.h>
 #include <sys/stat.h>
@@ -914,11 +916,29 @@ static int daemonize()
   return 0;
 }
 
+void handler(int sig)
+{
+  void *array[10];
+  size_t size;
+
+  // get void*'s for all entries on the stack
+  size = backtrace(array, 10);
+
+  // print out all the frames to stderr
+  fprintf(stderr, "Error: signal %d:\n", sig);
+  backtrace_symbols_fd(array, size, STDERR_FILENO);
+  exit(1);
+}
+
 int main(int argc, char** argv)
 {
   int r = daemonize();
   if (r < 0)
     return r;
+
+  signal(SIGSEGV, handler);
+  signal(SIGABRT, handler);
+  signal(SIGFPE, handler);
 
   shared_memory_object::remove("AudioServiceShmem");
   managed_shared_memory shm{open_or_create, "AudioServiceShmem", AudioServerShmemSize};
