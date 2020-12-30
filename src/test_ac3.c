@@ -20,7 +20,7 @@
 #include "audio_if.h"
 
 #define min(a, b) ((a) < (b) ? (a) : (b))
-#define WRITE_UNIT 4096
+#define WRITE_UNIT 1536
 
 static int test_stream(struct audio_stream_out *stream)
 {
