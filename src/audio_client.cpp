@@ -3,7 +3,8 @@
 #include <hardware/hardware.h>
 #include <hardware/audio.h>
 
-#include "CircularBuffer.h"
+#include <IpcBuffer/audio_server_shmem.h>
+#include <IpcBuffer/IpcBuffer.h>
 #include "audio_client.h"
 
 #define LOG_TAG "audio_client"
@@ -489,9 +490,9 @@ ssize_t AudioClient::stream_in_read(struct audio_stream_in *stream,
   char *name = (audio_stream_in_to_client(stream))->name;
   Status status = stub_->StreamIn_read(&context, MakeStreamReadWrite(name, bytes), &r);
   if (r.ret() > 0) {
-    CircularBuffer *cb = shm_->find<CircularBuffer>(name).first;
+    IpcBuffer *cb = audio_server_shmem::getInstance()->find<IpcBuffer>(name).first;
     if (cb) {
-      memcpy(buffer, cb->start_ptr(*shm_), r.ret());
+      memcpy(buffer, cb->start_ptr(), r.ret());
     }
   }
   return r.ret();
@@ -547,9 +548,9 @@ ssize_t AudioClient::stream_out_write(struct audio_stream_out *stream, const voi
   ClientContext context;
   StatusReturn r;
   char *name = (audio_stream_out_to_client(stream))->name;
-  CircularBuffer *cb = shm_->find<CircularBuffer>(name).first;
+  IpcBuffer *cb = audio_server_shmem::getInstance()->find<IpcBuffer>(name).first;
   if (cb) {
-    memcpy(cb->start_ptr(*shm_), buffer, std::min(bytes, cb->capacity()));
+    memcpy(cb->start_ptr(), buffer, std::min(bytes, cb->capacity()));
   }
   Status status = stub_->StreamOut_write(&context, MakeStreamReadWrite(name, bytes), &r);
   return r.ret();

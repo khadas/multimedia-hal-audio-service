@@ -1,5 +1,3 @@
-COMMON_OBJS=src/CircularBuffer.o
-
 PROTO_SRCS=src/audio_service.grpc.pb.cc src/audio_service.pb.cc
 PROTO_OBJS+=$(PROTO_SRCS:.cc=.o)
 
@@ -29,7 +27,7 @@ GRPC_CPP_PLUGIN_PATH=$(HOST_DIR)/bin/grpc_cpp_plugin
 
 CFLAGS+=-fPIC -O2 -I$(PROTOC_INC) -I./include -I. -I./src
 CXXFLAGS+=-std=c++14
-SC_LDFLAGS+=-Wl,--no-as-needed -lgrpc++_unsecure -lprotobuf -lboost_system -llog -ldl -lrt -lpthread -lstdc++ -pthread
+SC_LDFLAGS+=-Wl,--no-as-needed -lgrpc++_unsecure -lprotobuf -lboost_system -lamaudioutils -llog -ldl -lrt -lpthread -lstdc++ -pthread
 LDFLAGS+= -Wl,--no-as-needed -llog -ldl -lrt -lpthread -lstdc++ -pthread
 
 %.grpc.pb.cc: %.proto

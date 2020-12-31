@@ -22,9 +22,10 @@
 #include <grpcpp/server_builder.h>
 #include <grpcpp/server_context.h>
 #include <grpcpp/security/server_credentials.h>
+#include <IpcBuffer/audio_server_shmem.h>
+#include <IpcBuffer/IpcBuffer.h>
 #include "audio_if.h"
 #include "audio_service.grpc.pb.h"
-#include "CircularBuffer.h"
 #include "audio_effect_if.h"
 
 using grpc::Server;
@@ -73,16 +74,14 @@ using namespace audio_service;
 #define TRACE_EXIT()
 #endif
 
-const int AudioServerShmemSize = 16 * 1024 * 1024;
-
-typedef std::pair<CircularBuffer *, struct audio_stream_out *> streamout_map_t;
-typedef std::pair<CircularBuffer *, struct audio_stream_in *> streamin_map_t;
+typedef std::pair<IpcBuffer *, struct audio_stream_out *> streamout_map_t;
+typedef std::pair<IpcBuffer *, struct audio_stream_in *> streamin_map_t;
 
 class AudioServiceImpl final : public AudioService::Service
 {
   public:
-    explicit AudioServiceImpl(managed_shared_memory &shm)
-      : shm_(shm),
+    explicit AudioServiceImpl()
+      : shm_(audio_server_shmem::getInstance(true)),
         gc_runner_(std::thread([this] {
           while (!gc_runner_stop_) {
             streamout_gc_();
@@ -242,9 +241,10 @@ class AudioServiceImpl final : public AudioService::Service
                           request->address().c_str()));
 
       if (stream) {
-        CircularBuffer * cb = shm_.find<CircularBuffer>(request->name().c_str()).first;
-        if (cb == nullptr)
-          cb = shm_.construct<CircularBuffer>(request->name().c_str())(shm_, request->size());
+        IpcBuffer * cb = shm_->find<IpcBuffer>(request->name().c_str()).first;
+        if (cb == nullptr) {
+          cb = shm_->construct<IpcBuffer>(request->name().c_str())(request->name().c_str(), request->size());
+        }
 
         std::lock_guard<std::mutex> lock(map_out_mutex_);
         streamout_map_.insert(
@@ -264,7 +264,7 @@ class AudioServiceImpl final : public AudioService::Service
       dev_->close_output_stream(dev_, it->second.second);
 
       if (it->second.first) {
-        shm_.destroy<CircularBuffer>(request->name().c_str());
+        shm_->destroy<IpcBuffer>(request->name().c_str());
       }
 
       std::lock_guard<std::mutex> lock(map_out_mutex_);
@@ -298,9 +298,9 @@ class AudioServiceImpl final : public AudioService::Service
                           (audio_source_t)(request->source())));
 
       if (stream) {
-        CircularBuffer * cb = shm_.find<CircularBuffer>(request->name().c_str()).first;
+        IpcBuffer * cb = shm_->find<IpcBuffer>(request->name().c_str()).first;
         if (cb == nullptr)
-          cb = shm_.construct<CircularBuffer>(request->name().c_str())(shm_, request->size());
+          cb = shm_->construct<IpcBuffer>(request->name().c_str())(request->name().c_str(), request->size());
 
         std::lock_guard<std::mutex> lock(map_in_mutex_);
         streamin_map_.insert(
@@ -320,7 +320,7 @@ class AudioServiceImpl final : public AudioService::Service
       dev_->close_input_stream(dev_, it->second.second);
 
       if (it->second.first) {
-        shm_.destroy<CircularBuffer>(request->name().c_str());
+        shm_->destroy<IpcBuffer>(request->name().c_str());
       }
 
       std::lock_guard<std::mutex> lock(map_in_mutex_);
@@ -593,8 +593,8 @@ class AudioServiceImpl final : public AudioService::Service
       struct audio_stream_out *stream = find_streamout(request->name(), streamout_map_);
       if (stream == nullptr) return Status::CANCELLED;
 
-      CircularBuffer *cb = shm_.find<CircularBuffer>(request->name().c_str()).first;
-      response->set_ret(stream->write(stream, cb->start_ptr(shm_), request->size()));
+      IpcBuffer *cb = shm_->find<IpcBuffer>(request->name().c_str()).first;
+      response->set_ret(stream->write(stream, cb->start_ptr(), request->size()));
       return Status::OK;
     }
 
@@ -691,8 +691,8 @@ class AudioServiceImpl final : public AudioService::Service
       struct audio_stream_in *stream = find_streamin(request->name(), streamin_map_);
       if (stream == nullptr) return Status::CANCELLED;
 
-      CircularBuffer *cb = shm_.find<CircularBuffer>(request->name().c_str()).first;
-      response->set_ret(stream->read(stream, cb->start_ptr(shm_), std::min(request->size(), cb->capacity())));
+      IpcBuffer *cb = shm_->find<IpcBuffer>(request->name().c_str()).first;
+      response->set_ret(stream->read(stream, cb->start_ptr(), std::min(request->size(), cb->capacity())));
       return Status::OK;
     }
 
@@ -781,7 +781,7 @@ class AudioServiceImpl final : public AudioService::Service
             ALOGI("Close disconnected output stream from PID %d", pid);
             dev_->close_output_stream(dev_, it->second.second);
             if (it->second.first) {
-              shm_.destroy<CircularBuffer>(it->first.c_str());
+              shm_->destroy<IpcBuffer>(it->first.c_str());
             }
             streamout_map_.erase(it++);
           } else {
@@ -857,7 +857,7 @@ class AudioServiceImpl final : public AudioService::Service
       return nullptr;
     }
 
-    managed_shared_memory &shm_;
+    managed_shared_memory *shm_;
 
     /* audio hal interface */
     struct audio_hw_device *dev_;
@@ -877,11 +877,11 @@ class AudioServiceImpl final : public AudioService::Service
 std::mutex AudioServiceImpl::map_out_mutex_;
 std::mutex AudioServiceImpl::map_in_mutex_;
 
-void RunServer(managed_shared_memory& shm)
+void RunServer()
 {
   const char *url = std::getenv("AUDIO_SERVER_SOCKET");
   std::string server_address("unix:///opt/audio_socket");
-  AudioServiceImpl service(shm);
+  AudioServiceImpl service;
   if (url) {
       server_address = url;
   }
@@ -941,8 +941,7 @@ int main(int argc, char** argv)
   signal(SIGFPE, handler);
 
   shared_memory_object::remove("AudioServiceShmem");
-  managed_shared_memory shm{open_or_create, "AudioServiceShmem", AudioServerShmemSize};
 
-  RunServer(shm);
+  RunServer();
   return 0;
 }

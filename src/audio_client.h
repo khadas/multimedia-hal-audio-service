@@ -8,7 +8,7 @@
 
 #include <hardware/hardware.h>
 #include <hardware/audio.h>
-#include "CircularBuffer.h"
+#include <IpcBuffer/IpcBuffer.h>
 
 #include <grpc/grpc.h>
 #include <grpcpp/channel.h>
@@ -71,9 +71,7 @@ using namespace audio_service;
 class AudioClient {
   public:
     AudioClient(std::shared_ptr<Channel> channel)
-      : stub_(AudioService::NewStub(channel)) {
-        shm_ = std::make_unique<managed_shared_memory>(open_only, "AudioServiceShmem");
-      }
+      : stub_(AudioService::NewStub(channel)) {}
 
     // Device methods
     int Device_common_close(struct hw_device_t* device);
@@ -171,7 +169,6 @@ class AudioClient {
     }
 
     std::unique_ptr<AudioService::Stub> stub_;
-    std::unique_ptr<managed_shared_memory> shm_;
     static std::atomic_int stream_seq_;
 };
 
