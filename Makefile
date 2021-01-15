@@ -30,19 +30,16 @@ CXXFLAGS+=-std=c++14
 SC_LDFLAGS+=-Wl,--no-as-needed -lgrpc++_unsecure -lprotobuf -lboost_system -lamaudioutils -llog -ldl -lrt -lpthread -lstdc++ -pthread
 LDFLAGS+= -Wl,--no-as-needed -llog -ldl -lrt -lpthread -lstdc++ -pthread
 
-%.grpc.pb.cc: %.proto
+%.grpc.pb.cc %.grpc.pb.h: %.proto
 	$(PROTOC) -I=. -I=$(PROTOC_INC) --grpc_out=. --plugin=protoc-gen-grpc=$(GRPC_CPP_PLUGIN_PATH) $<
 
-%.pb.h: %.proto
+%.pb.cc %.pb.h: %.proto
 	$(PROTOC) -I=. -I=$(PROTOC_INC) --cpp_out=. --plugin=protoc-gen-grpc=$(GRPC_CPP_PLUGIN_PATH) $<
 
-%.pb.cc: %.proto
-	$(PROTOC) -I=. -I=$(PROTOC_INC) --cpp_out=. --plugin=protoc-gen-grpc=$(GRPC_CPP_PLUGIN_PATH) $<
-
-%.o: %.cpp
+%.pb.o: %.pb.cc %.pb.h
 	$(CC) -c $(CFLAGS) $(CXXFLAGS) -o $@ $<
 
-%.o: %.cc
+%.o: %.cpp
 	$(CC) -c $(CFLAGS) $(CXXFLAGS) -o $@ $<
 
 %.o: %.c
