@@ -82,6 +82,7 @@ class AudioServiceImpl final : public AudioService::Service
   public:
     explicit AudioServiceImpl()
       : shm_(audio_server_shmem::getInstance(true)),
+        gc_runner_stop_(false),
         gc_runner_(std::thread([this] {
           while (!gc_runner_stop_) {
             streamout_gc_();
