@@ -693,7 +693,7 @@ class AudioServiceImpl final : public AudioService::Service
       if (stream == nullptr) return Status::CANCELLED;
 
       IpcBuffer *cb = shm_->find<IpcBuffer>(request->name().c_str()).first;
-      response->set_ret(stream->read(stream, cb->start_ptr(), std::min(request->size(), cb->capacity())));
+      response->set_ret(stream->read(stream, cb->start_ptr(), std::min((size_t) request->size(), cb->capacity())));
       return Status::OK;
     }
 
