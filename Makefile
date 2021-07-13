@@ -10,6 +10,7 @@ CLIENT_OBJS+=$(COMMON_OBJS) $(PROTO_OBJS)
 TEST_PCM_OBJS=src/test.o
 TEST_DOLBY_OBJS=src/test_ac3.o
 TEST_HALPLAY_OBJS=src/halplay.o
+TEST_HALCAPTURE_OBJS=src/hal_capture.o
 TEST_MS12_OBJS=src/dap_setting.o
 TEST_SPEAKER_DELAY_OBJS=src/speaker_delay.o
 TEST_DIGITAL_MODE_OBJS=src/digital_mode.o
@@ -50,7 +51,7 @@ src/audio_server.cpp: src/audio_service.pb.h src/audio_service.grpc.pb.cc
 src/audio_client.cpp: src/audio_service.pb.h src/audio_service.grpc.pb.cc
 src/audio_if_client.cpp: src/audio_service.pb.h src/audio_service.grpc.pb.cc
 
-all: audio_server libaudio_client.so audio_client_test audio_client_test_ac3 halplay dap_setting speaker_delay digital_mode test_arc start_arc hal_param hal_dump hal_patch master_vol effect_tool
+all: audio_server libaudio_client.so audio_client_test audio_client_test_ac3 halplay hal_capture dap_setting speaker_delay digital_mode test_arc start_arc hal_param hal_dump hal_patch master_vol effect_tool
 
 audio_server: $(SERVER_OBJS)
 	$(CC) $(CFLAGS) $(SC_LDFLAGS) -o $@ $^
@@ -65,6 +66,9 @@ audio_client_test_ac3: $(TEST_DOLBY_OBJS) libaudio_client.so
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
 
 halplay: $(TEST_HALPLAY_OBJS) libaudio_client.so
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
+
+hal_capture: $(TEST_HALCAPTURE_OBJS) libaudio_client.so
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
 
 dap_setting: $(TEST_MS12_OBJS) libaudio_client.so
@@ -103,6 +107,7 @@ install:
 	install -m 755 -D audio_client_test -t $(TARGET_DIR)/usr/bin/
 	install -m 755 -D audio_client_test_ac3 $(TARGET_DIR)/usr/bin/
 	install -m 755 -D halplay $(TARGET_DIR)/usr/bin/
+	install -m 755 -D hal_capture $(TARGET_DIR)/usr/bin/
 	install -m 755 -D dap_setting $(TARGET_DIR)/usr/bin/
 	install -m 755 -D speaker_delay $(TARGET_DIR)/usr/bin/
 	install -m 755 -D digital_mode $(TARGET_DIR)/usr/bin/
@@ -132,6 +137,7 @@ clean:
 	rm -f audio_client_test
 	rm -f audio_client_test_ac3
 	rm -f halplay
+	rm -f hal_capture
 	rm -f test_arc
 	rm -f start_arc
 	rm -f hal_param
@@ -146,6 +152,7 @@ clean:
 	rm -f $(TARGET_DIR)/usr/bin/audio_client_test
 	rm -f $(TARGET_DIR)/usr/bin/audio_client_test_ac3
 	rm -f $(TARGET_DIR)/usr/bin/halplay
+	rm -f $(TARGET_DIR)/usr/bin/hal_capture
 	rm -f $(TARGET_DIR)/usr/bin/speaker_delay
 	rm -f $(TARGET_DIR)/usr/bin/digital_mode
 	rm -f $(TARGET_DIR)/usr/bin/test_arc

@@ -124,7 +124,7 @@ OpenInputStream MakeOpenInputStream(std::string name,
   opt.set_devices(devices);
   opt.mutable_config()->CopyFrom(MakeAudioConfig(config));
   opt.set_flags(flags);
-  opt.set_address(std::string(address));
+  opt.set_address(address ? std::string(address) : std::string(""));
   opt.set_source(source);
   return opt;
 }
