@@ -25,17 +25,44 @@
 #define min(a, b) ((a) < (b) ? (a) : (b))
 #define WRITE_UNIT 4096
 
-#define FORMAT_PCM16    0
-#define FORMAT_PCM32    1
-#define FORMAT_DD       2
-#define FORMAT_MAT      3
-#define FORMAT_IEC61937 4
-#define FORMAT_AC4      5
-#define FORMAT_MAX      6
+enum audio_format {
+    FORMAT_PCM16 = 0,
+    FORMAT_PCM32,
+    FORMAT_DD,
+    FORMAT_MAT,
+    FORMAT_IEC61937,
+    FORMAT_AC4 = 5,
+    FORMAT_MP3,
+    FORMAT_AAC,
+    FORMAT_OGG,
+    FORMAT_FLAC,
+    FORMAT_MAX
+};
 
-static int format_tab[] = {AUDIO_FORMAT_PCM_16_BIT, AUDIO_FORMAT_PCM_32_BIT, AUDIO_FORMAT_AC3, AUDIO_FORMAT_MAT, AUDIO_FORMAT_IEC61937, AUDIO_FORMAT_AC4};
+static int format_tab[] = {
+    AUDIO_FORMAT_PCM_16_BIT,
+    AUDIO_FORMAT_PCM_32_BIT,
+    AUDIO_FORMAT_AC3,
+    AUDIO_FORMAT_MAT,
+    AUDIO_FORMAT_IEC61937,
+    AUDIO_FORMAT_AC4,
+    AUDIO_FORMAT_MP3,
+    AUDIO_FORMAT_AAC,
+    AUDIO_FORMAT_VORBIS,
+    AUDIO_FORMAT_FLAC
+};
+
 static const char *format_str[] = {
-    "PCM_16", "PCM_32", "DOLBY DD/DD+", "DOLBY MAT", "IEC_61937", "AC4"
+    "PCM_16",
+    "PCM_32",
+    "DOLBY DD/DD+",
+    "DOLBY MAT",
+    "IEC_61937",
+    "AC4",
+    "MP3",
+    "AAC",
+    "OGG",
+    "FLAC"
 };
 
 static int format_is_pcm(int format)
@@ -221,29 +248,49 @@ int main(int argc, char **argv)
     /* set audio config */
     memset(&config, 0, sizeof(config));
 
-    if (format_is_pcm(format)) {
-        config.sample_rate = sr;
-        switch (ch) {
-            case 1:
-                config.channel_mask = AUDIO_CHANNEL_OUT_MONO;
-                break;
-            case 2:
-                config.channel_mask = AUDIO_CHANNEL_OUT_STEREO;
-                break;
-            case 6:
-                config.channel_mask = AUDIO_CHANNEL_OUT_5POINT1;
-                break;
-            case 8:
-                config.channel_mask = AUDIO_CHANNEL_OUT_7POINT1;
-                break;
-            default:
-                config.channel_mask = AUDIO_CHANNEL_OUT_STEREO;
-                break;
-        }
-    } else {
-        config.sample_rate = 48000;
-        config.channel_mask = AUDIO_CHANNEL_OUT_5POINT1;
+    switch (format) {
+        case FORMAT_PCM16:
+        case FORMAT_PCM32:
+            config.sample_rate = sr;
+            switch (ch) {
+                case 1:
+                    config.channel_mask = AUDIO_CHANNEL_OUT_MONO;
+                    break;
+                case 2:
+                    config.channel_mask = AUDIO_CHANNEL_OUT_STEREO;
+                    break;
+                case 6:
+                    config.channel_mask = AUDIO_CHANNEL_OUT_5POINT1;
+                    break;
+                case 8:
+                    config.channel_mask = AUDIO_CHANNEL_OUT_7POINT1;
+                    break;
+                default:
+                    config.channel_mask = AUDIO_CHANNEL_OUT_STEREO;
+                    break;
+            }
+            break;
+
+        case FORMAT_DD:
+        case FORMAT_MAT:
+        case FORMAT_IEC61937:
+        case FORMAT_AC4:
+            config.sample_rate = 48000;
+            config.channel_mask = AUDIO_CHANNEL_OUT_5POINT1;
+            break;
+
+        case FORMAT_MP3:
+        case FORMAT_AAC:
+        case FORMAT_OGG:
+        case FORMAT_FLAC:
+            config.sample_rate = sr;
+            config.channel_mask = AUDIO_CHANNEL_OUT_STEREO;
+            break;
+
+        default:
+            break;
     }
+
     config.format = format_tab[format];
 
     test_output_stream(device, buf, size, &config);
