@@ -245,6 +245,8 @@ class AudioServiceImpl final : public AudioService::Service
         IpcBuffer * cb = shm_->find<IpcBuffer>(request->name().c_str()).first;
         if (cb == nullptr) {
           cb = shm_->construct<IpcBuffer>(request->name().c_str())(request->name().c_str(), request->size());
+          std::cout << "[AudioServer] open stream pid-seq " << request->name().c_str() << std::endl;
+          ALOGI("%s pid-seq %s\n", __func__, request->name().c_str());
         }
 
         std::lock_guard<std::mutex> lock(map_out_mutex_);
@@ -262,6 +264,8 @@ class AudioServiceImpl final : public AudioService::Service
       std::map<const std::string, streamout_map_t >::iterator it = streamout_map_.find(request->name());
       if (it == streamout_map_.end()) return Status::CANCELLED;
 
+      std::cout << "[AudioServer] close stream pid-seq " << request->name().c_str() << std::endl;
+      ALOGI("%s pid-seq %s\n", __func__, request->name().c_str());
       dev_->close_output_stream(dev_, it->second.second);
 
       if (it->second.first) {
