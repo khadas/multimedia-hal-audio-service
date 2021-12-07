@@ -945,8 +945,6 @@ int main(int argc, char** argv)
   signal(SIGABRT, handler);
   signal(SIGFPE, handler);
 
-  shared_memory_object::remove("AudioServiceShmem");
-
   RunServer();
   return 0;
 }
