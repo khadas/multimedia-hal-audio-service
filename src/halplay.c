@@ -21,6 +21,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include "audio_if.h"
+#include <signal.h>
 
 #define min(a, b) ((a) < (b) ? (a) : (b))
 #define WRITE_UNIT 4096
@@ -95,6 +96,7 @@ static void funmap(unsigned char *p, int size, int fd)
         close(fd);
 }
 
+int isstop = 0;
 static int test_stream(struct audio_stream_out *stream, unsigned char *buf, int size)
 {
     int ret;
@@ -120,11 +122,14 @@ static int test_stream(struct audio_stream_out *stream, unsigned char *buf, int 
             fprintf(stderr, "stream writing error %d\n", s);
             break;
         }
-
+        if (isstop) {
+            break;
+        }
+        printf("stream writing %d \n", s);
         len -= s;
         data += s;
     }
-
+    isstop = 0;
     return 0;
 }
 
@@ -150,7 +155,12 @@ static void test_output_stream(audio_hw_device_t *device, unsigned char *buf, in
     printf("close output speaker...\n");
     device->close_output_stream(device, stream);
 }
-
+void handler_halplay(int sig)
+{
+    isstop=1;
+    while (isstop != 1);
+    printf("\n handler_halplay...\n");
+}
 int main(int argc, char **argv)
 {
     audio_hw_device_t *device;
@@ -292,7 +302,7 @@ int main(int argc, char **argv)
     }
 
     config.format = format_tab[format];
-
+    signal(SIGINT, handler_halplay);
     test_output_stream(device, buf, size, &config);
 
     funmap(buf, size, fd);
