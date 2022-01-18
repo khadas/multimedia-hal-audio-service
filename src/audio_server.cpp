@@ -882,10 +882,19 @@ class AudioServiceImpl final : public AudioService::Service
 std::mutex AudioServiceImpl::map_out_mutex_;
 std::mutex AudioServiceImpl::map_in_mutex_;
 
+static void SetAudioPermissions(const char* file_path){
+  struct stat buf;
+  if (stat(file_path, &buf) != 0)
+    return;
+
+  chmod(file_path, (buf.st_mode & 0711) | 0066);
+}
+
 void RunServer()
 {
   const char *url = std::getenv("AUDIO_SERVER_SOCKET");
-  std::string server_address("unix:///opt/audio_socket");
+  std::string socket_location("/tmp/audio_socket");
+  std::string server_address("unix://" + socket_location);
   AudioServiceImpl service;
   if (url) {
       server_address = url;
@@ -894,6 +903,8 @@ void RunServer()
   builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
   builder.RegisterService(&service);
   std::unique_ptr<Server> server(builder.BuildAndStart());
+  SetAudioPermissions(socket_location.c_str());
+  SetAudioPermissions("/dev/shm/AudioServiceShmem");
   std::cout << "[AudioServer] listening on " << server_address << std::endl;
   server->Wait();
 }
