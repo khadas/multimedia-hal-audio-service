@@ -106,13 +106,16 @@ out:
 void audio_hw_unload_interface(audio_hw_device_t *dev)
 {
     struct hw_module_t *pHmi = dev->common.module;
-
+    int ret = 0;
     pthread_mutex_lock(&if_mutex);
+
     if (if_ref_cnt >= 1)
         if_ref_cnt--;
     if (if_ref_cnt == 0 && pHmi) {
-        dlclose(pHmi->dso);
-        pHmi->dso = NULL;
+        ret = dlclose(pHmi->dso);
+        if (ret)
+            ALOGE("%s, failed to close audio_hal module:%s\n", __FUNCTION__, dlerror());
+        pHmi = NULL;
         hw_dev = NULL;
     }
     pthread_mutex_unlock(&if_mutex);
