@@ -164,7 +164,7 @@ void handler_halplay(int sig)
 int main(int argc, char **argv)
 {
     audio_hw_device_t *device;
-    int ret, c = -1, format = FORMAT_MAX, ch = 0, sr = 0;
+    int ret, c = -1, format = FORMAT_MAX, ch = 0, sr = 0, help = 0;
     struct audio_config config;
     const char *fn = NULL;
     int size = 0;
@@ -173,10 +173,11 @@ int main(int argc, char **argv)
 
     if (argc == 1) {
         printf("Usage: halplay -f <format> -c <channel number> -r <sample rate> <filename>\n");
+        printf("more param Info: halplay -h\n");
         return 0;
     }
 
-    while ((c = getopt(argc, argv, "f:c:r:")) != -1) {
+    while ((c = getopt(argc, argv, "f:c:r:h")) != -1) {
         switch (c) {
             case 'f':
                 format = atoi(optarg);
@@ -187,6 +188,9 @@ int main(int argc, char **argv)
             case 'r':
                 sr = atoi(optarg);
                 break;
+            case 'h':
+                help = 1;
+                break;
             case '?':
                 fprintf(stderr, "Error in an argument.\n");
                 return -1;
@@ -194,7 +198,19 @@ int main(int argc, char **argv)
                 return -1;
         }
     }
-
+    if (help == 1) {
+        printf("Usage: halplay -f <format> -c <channel number> -r <sample rate> <filename>\n");
+        printf("\n-h,           help\n");
+        printf("-f,           sample format\n");
+        printf("-c,           channels\n");
+        printf("-r,           sample rate\n");
+        printf("Recognized sample formats are: 0:PCM16 1:PCM32 2:DD 3:MAT 4:IEC61937 5:AC4 6:MP3 7:AAC 8:OGG 9:FLAC\n");
+        printf("Some of these may not be available on selected format\n");
+        printf("the available params for PCM16 and PCM32 are:\n");
+        printf("-c 1,2,6,8\n");
+        printf("-r 32000,44100,48000\n");
+        return 0;
+    }
     if (optind < argc) {
         fn = argv[optind];
     }
