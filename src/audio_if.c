@@ -20,6 +20,7 @@ static int load(const char *id,
     int status = -EINVAL;
     void *handle = NULL;
     struct hw_module_t *hmi = NULL;
+    const char *sym = HAL_MODULE_INFO_SYM_AS_STR;
 
     handle = dlopen(path, RTLD_NOW);
     if (!handle) {
@@ -30,7 +31,6 @@ static int load(const char *id,
     }
 
     /* Get the address of the struct hal_module_info. */
-    const char *sym = HAL_MODULE_INFO_SYM_AS_STR;
     hmi = (struct hw_module_t *)dlsym(handle, sym);
     if (!hmi) {
         ALOGE("load: couldn't find symbol %s", sym);
@@ -70,7 +70,7 @@ done:
 int audio_hw_load_interface(audio_hw_device_t **dev)
 {
     int r;
-    struct hw_module_t *pHmi;
+    struct hw_module_t *pHmi = NULL;
 
     pthread_mutex_lock(&if_mutex);
     if (if_ref_cnt) {

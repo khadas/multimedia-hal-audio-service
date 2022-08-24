@@ -310,7 +310,7 @@ int main(int argc, char *argv[])
         Cec_fd = open (DEV_CEC, O_RDWR);
 
         if (Cec_fd < 0) {
-            printf ("%s CEC_device opening returned %d",DEV_CEC);
+            printf ("%s CEC_device opening returned %d", DEV_CEC, Cec_fd);
             return -1;
         }
 

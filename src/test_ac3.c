@@ -71,7 +71,7 @@ static int test_stream(struct audio_stream_out *stream)
         printf("%s %d, ret:%x\n", __func__, __LINE__, ret);
         return -1;
     }
-    printf("%s %d, write %d pos:%d\n", __func__, __LINE__, pos);
+    printf("%s %d, pos:%d\n", __func__, __LINE__, pos);
     return 0;
 }
 

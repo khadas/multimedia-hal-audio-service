@@ -246,7 +246,7 @@ int main(int argc, char *argv[])
     }
 
     capture_open_input_stream(&config);
-    capture_read_input_stream(stream);
+    capture_read_input_stream();
     capture_close_input_stream();
 
 exit:

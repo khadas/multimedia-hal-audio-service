@@ -88,12 +88,13 @@ void* CEC_event_read_fn (void *data)
 
     while(!stop) {
         mask = poll(&polling,1,timeout);
-        
+
         if (mask & POLLIN || mask & POLLRDNORM ) {
             read_len= read(Cec_fd, &cecmsg, 1);
             process_cec_msg(cecmsg,read_len);
         }
     }
+    return;
 }
 
 static void sighandler(int sig)
@@ -103,15 +104,15 @@ static void sighandler(int sig)
     printf("sighandler! Done\n");
 }
 
-int main ( int argc, char *argv[] ) 
+int main ( int argc, char *argv[] )
 {
     char msg[16];
     int ret=0;
-  
+
     Cec_fd = open (DEV_CEC, O_RDWR);
 
     if (Cec_fd < 0) {
-        printf ("%s CEC_device opening returned %d",DEV_CEC);
+        printf ("%s CEC_device opening returned %d", DEV_CEC, Cec_fd);
         return -1;
     }
 
@@ -126,7 +127,7 @@ int main ( int argc, char *argv[] )
     signal(SIGUSR1, sighandler);
 
     ioctl(Cec_fd, CEC_IOC_SET_OPTION_SYS_CTRL, 0x8);
-	
+
     ioctl(Cec_fd, CEC_IOC_ADD_LOGICAL_ADDR, 0x0);
 
     /* request ARC initialisation */
@@ -146,11 +147,11 @@ int main ( int argc, char *argv[] )
     ret = pthread_join(CEC_Event_Thread, NULL);
     if (ret != 0) {
         printf("CEC_Event_Thread returned error\n");
-    }	
+    }
 
     //ioctl(Cec_fd, CEC_IOC_CLR_LOGICAL_ADDR, 0x0);
     //ioctl(Cec_fd, CEC_IOC_SET_OPTION_SYS_CTRL, 0x0);
-	
+
     close(Cec_fd);
 
     return 0;

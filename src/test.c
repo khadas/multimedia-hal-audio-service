@@ -155,7 +155,7 @@ static int test_stream(struct audio_stream_out *stream)
             int remain = sizeof(wav_data) - offset;
             if (remain > wr_unit)
                 remain = wr_unit;
-            size_t s = stream->write(stream, &wav_data[offset], remain);
+            ssize_t s = stream->write(stream, &wav_data[offset], remain);
             if (s < 0)
                 break;
             offset += s;
@@ -171,7 +171,7 @@ static int test_stream(struct audio_stream_out *stream)
         printf("%s %d, ret:%x\n", __func__, __LINE__, ret);
         return -1;
     }
-    printf("%s %d, write %d pos:%d\n", __func__, __LINE__, pos);
+    printf("%s %d, pos:%d\n", __func__, __LINE__, pos);
 
     ret = stream->pause(stream);
     if (ret) {
