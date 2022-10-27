@@ -3,6 +3,7 @@ PROTO_OBJS+=$(PROTO_SRCS:.cc=.o)
 
 SERVER_OBJS=src/audio_server.o src/audio_if.o
 CLIENT_OBJS=src/audio_client.o src/audio_if_client.o
+HAL_APLUG_OBJS = hal_aplug/hal_aplug.o
 
 SERVER_OBJS+=$(COMMON_OBJS) $(PROTO_OBJS)
 CLIENT_OBJS+=$(COMMON_OBJS) $(PROTO_OBJS)
@@ -27,6 +28,9 @@ PROTOC_INC=$(HOST_DIR)/include
 GRPC_CPP_PLUGIN_PATH=$(HOST_DIR)/bin/grpc_cpp_plugin
 
 CFLAGS+=-fPIC -O2 -I$(PROTOC_INC) -I./include -I. -I./src
+ifeq ($(aplugin),y)
+	CFLAGS+= -DPIC
+endif
 CXXFLAGS+=-std=c++14
 SC_LDFLAGS+=-Wl,--no-as-needed -lgrpc++_unsecure -lprotobuf -lboost_system -lamaudioutils -llog -ldl -lrt -lpthread -lstdc++ -pthread
 LDFLAGS+= -Wl,--no-as-needed -llog -ldl -lrt -lpthread -lstdc++ -pthread
@@ -51,13 +55,22 @@ src/audio_server.cpp: src/audio_service.pb.h src/audio_service.grpc.pb.cc
 src/audio_client.cpp: src/audio_service.pb.h src/audio_service.grpc.pb.cc
 src/audio_if_client.cpp: src/audio_service.pb.h src/audio_service.grpc.pb.cc
 
-all: audio_server libaudio_client.so audio_client_test audio_client_test_ac3 halplay hal_capture dap_setting speaker_delay digital_mode test_arc start_arc hal_param hal_dump hal_patch master_vol effect_tool
+obj= audio_server libaudio_client.so audio_client_test audio_client_test_ac3 halplay hal_capture dap_setting speaker_delay digital_mode test_arc start_arc hal_param hal_dump hal_patch master_vol effect_tool
+ifeq ($(aplugin),y)
+	obj+= libasound_module_pcm_ahal.so
+endif
+
+all:$(obj)
+
 
 audio_server: $(SERVER_OBJS)
 	$(CC) $(CFLAGS) $(SC_LDFLAGS) -o $@ $^
 
 libaudio_client.so: $(CLIENT_OBJS)
 	$(CC) $(CFLAGS) $(SC_LDFLAGS) -shared -o $@ $^
+
+libasound_module_pcm_ahal.so: $(HAL_APLUG_OBJS) libaudio_client.so
+	$(CC) $(CFLAGS) $(SC_LDFLAGS) -lasound -shared -o $@ $^
 
 audio_client_test: $(TEST_PCM_OBJS) libaudio_client.so
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
@@ -120,6 +133,9 @@ install:
 	install -m 755 -D effect_tool $(TARGET_DIR)/usr/bin/
 	install -m 644 -D libaudio_client.so -t $(TARGET_DIR)/usr/lib/
 	install -m 644 -D libaudio_client.so -t $(STAGING_DIR)/usr/lib/
+ifeq ($(aplugin),y)
+	install -m 644 -D libasound_module_pcm_ahal.so -t $(TARGET_DIR)/usr/lib/alsa-lib/
+endif
 	install -m 644 -D include/audio_if_client.h -t $(STAGING_DIR)/usr/include
 	install -m 644 -D include/audio_if.h -t $(STAGING_DIR)/usr/include
 	install -m 644 -D include/audio_effect_if.h -t $(STAGING_DIR)/usr/include
