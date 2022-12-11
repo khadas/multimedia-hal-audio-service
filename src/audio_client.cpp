@@ -328,7 +328,7 @@ int AudioClient::Device_open_output_stream(struct audio_hw_device *dev,
 {
   TRACE_ENTRY();
   ClientContext context;
-  StatusReturn r;
+  DeviceOpenStreamReturn r;
   Status status = stub_->Device_open_output_stream(&context,
       MakeOpenOutputStream(new_stream_name(stream_out->name, sizeof(stream_out->name)),
                       kSharedBufferSize,
@@ -337,6 +337,7 @@ int AudioClient::Device_open_output_stream(struct audio_hw_device *dev,
                       flags,
                       config,
                       address), &r);
+  update_stream_name(stream_out->name, sizeof(stream_out->name), r.client_id());
   return r.ret();
 }
 
@@ -362,7 +363,7 @@ int AudioClient::Device_open_input_stream(struct audio_hw_device *dev,
 {
   TRACE_ENTRY();
   ClientContext context;
-  StatusReturn r;
+  DeviceOpenStreamReturn r;
   Status status = stub_->Device_open_input_stream(&context,
       MakeOpenInputStream(new_stream_name(stream_in->name, sizeof(stream_in->name)),
                       kSharedBufferSize,
@@ -372,6 +373,7 @@ int AudioClient::Device_open_input_stream(struct audio_hw_device *dev,
                       flags,
                       address,
                       source), &r);
+  update_stream_name(stream_in->name, sizeof(stream_in->name), r.client_id());
   return r.ret();
 }
 

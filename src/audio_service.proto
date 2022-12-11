@@ -69,11 +69,11 @@ service AudioService {
   // - Bluetooth devices use the MAC address of the device in the form "00:11:22:AA:BB:CC"
   // - USB devices use the ALSA card and device numbers in the form  "card=X;device=Y"
   // - Other devices may use a number or any other string.
-  rpc Device_open_output_stream(OpenOutputStream) returns (StatusReturn) {}
+  rpc Device_open_output_stream(OpenOutputStream) returns (DeviceOpenStreamReturn) {}
   rpc Device_close_output_stream(Stream) returns (StatusReturn) {}
 
   // This method creates and opens the audio hardware input stream
-  rpc Device_open_input_stream(OpenInputStream) returns (StatusReturn) {}
+  rpc Device_open_input_stream(OpenInputStream) returns (DeviceOpenStreamReturn) {}
   rpc Device_close_input_stream(Stream) returns (StatusReturn) {}
 
   rpc Device_dump(google.protobuf.Empty) returns (StatusReturn) {}
@@ -528,6 +528,11 @@ message StreamOutSetVolume {
 message StreamReadWrite {
   string name = 1;             // Stream
   uint32 size = 2;             // size
+}
+
+message DeviceOpenStreamReturn {
+  int32 ret = 1;
+  int32 client_id = 2;
 }
 
 message GetFrameTimestampReturn {

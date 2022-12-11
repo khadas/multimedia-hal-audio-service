@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <iomanip>
 #include <unistd.h>
+#include <fstream>
 
 #include <hardware/hardware.h>
 #include <hardware/audio.h>
@@ -162,10 +163,19 @@ class AudioClient {
     std::string new_stream_name(char *name, size_t size) {
       int pid = ::getpid();
       int seq = (stream_seq_++);
-      printf("pid=%d seq=%d\n", pid, seq);
       snprintf(name, size, "%d-%d", pid, seq);
-      printf("name = %s\n", name);
+      printf("pid=%d seq=%d name=%s\n", pid, seq, name);
       return std::string(name);
+    }
+    void update_stream_name(char *name, size_t size, int id) {
+      int pid = ::getpid();
+      if ((id != pid) && (id > 0)) {
+        int seq;
+        if (sscanf(name, "%d-%d", &pid, &seq) == 2) {
+          printf("vpid %d -> pid %d\n", pid, id);
+          snprintf(name, size, "%d-%d", id, seq);
+        }
+      }
     }
 
     std::unique_ptr<AudioService::Stub> stub_;
