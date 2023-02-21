@@ -7,11 +7,13 @@ CLIENT_OBJS=src/audio_client.o src/audio_if_client.o
 
 SERVER_OBJS+=$(COMMON_OBJS) $(PROTO_OBJS)
 CLIENT_OBJS+=$(COMMON_OBJS) $(PROTO_OBJS)
+AMLHALAUDIO_OBJS = src/AML_HAL_Audio.o
 
 TEST_PCM_OBJS=src/test.o
 TEST_DOLBY_OBJS=src/test_ac3.o
 TEST_HALPLAY_OBJS=src/halplay.o
 TEST_HALCAPTURE_OBJS=src/hal_capture.o
+TEST_AMLAUDIOHAL_OBJS=src/test_amlaudiohal.o
 TEST_MS12_OBJS=src/dap_setting.o
 TEST_SPEAKER_DELAY_OBJS=src/speaker_delay.o
 TEST_DIGITAL_MODE_OBJS=src/digital_mode.o
@@ -55,7 +57,7 @@ src/audio_server.cpp: src/audio_service.pb.h src/audio_service.grpc.pb.cc
 src/audio_client.cpp: src/audio_service.pb.h src/audio_service.grpc.pb.cc
 src/audio_if_client.cpp: src/audio_service.pb.h src/audio_service.grpc.pb.cc
 
-obj= audio_server libaudio_client.so audio_client_test audio_client_test_ac3 halplay hal_capture dap_setting speaker_delay digital_mode test_arc start_arc hal_param hal_dump hal_patch master_vol effect_tool
+obj= audio_server libaudio_client.so audio_client_test audio_client_test_ac3 halplay hal_capture dap_setting speaker_delay digital_mode libamlhalaudio.so test_amlhalaudio test_arc start_arc hal_param hal_dump hal_patch master_vol effect_tool
 ifeq ($(aplugin),y)
 	obj+= libasound_module_pcm_ahal.so
 endif
@@ -91,6 +93,12 @@ speaker_delay: $(TEST_SPEAKER_DELAY_OBJS) libaudio_client.so
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
 
 digital_mode: $(TEST_DIGITAL_MODE_OBJS) libaudio_client.so
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
+
+libamlhalaudio.so:$(AMLHALAUDIO_OBJS) libaudio_client.so
+	$(CC) $(CFLAGS) $(SC_LDFLAGS) -shared -o $@ $^
+
+test_amlhalaudio: $(TEST_AMLAUDIOHAL_OBJS) libaudio_client.so libamlhalaudio.so
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
 
 test_arc: $(TEST_ARC_TEST_OBJS) libaudio_client.so
@@ -131,7 +139,10 @@ install:
 	install -m 755 -D hal_patch $(TARGET_DIR)/usr/bin/
 	install -m 755 -D master_vol $(TARGET_DIR)/usr/bin/
 	install -m 755 -D effect_tool $(TARGET_DIR)/usr/bin/
+	install -m 755 -D test_amlhalaudio $(TARGET_DIR)/usr/bin/
 	install -m 644 -D libaudio_client.so -t $(TARGET_DIR)/usr/lib/
+	install -m 644 -D libamlhalaudio.so -t $(TARGET_DIR)/usr/lib/
+	install -m 644 -D libamlhalaudio.so -t $(STAGING_DIR)/usr/lib/
 	install -m 644 -D libaudio_client.so -t $(STAGING_DIR)/usr/lib/
 ifeq ($(aplugin),y)
 	install -m 644 -D libasound_module_pcm_ahal.so -t $(TARGET_DIR)/usr/lib/alsa-lib/
@@ -140,6 +151,7 @@ endif
 	install -m 644 -D include/audio_if.h -t $(STAGING_DIR)/usr/include
 	install -m 644 -D include/audio_effect_if.h -t $(STAGING_DIR)/usr/include
 	install -m 644 -D include/audio_effect_params.h -t $(STAGING_DIR)/usr/include
+	install -m 644 -D include/AML_HAL_Audio.h -t $(STAGING_DIR)/usr/include
 	for f in $(@D)/include/hardware/*.h; do \
 		install -m 644 -D $${f} -t $(STAGING_DIR)/usr/include/hardware; \
 	done
@@ -164,6 +176,7 @@ clean:
 	rm -rf $(STAGING_DIR)/usr/include/hardware
 	rm -rf $(STAGING_DIR)/usr/include/system
 	rm -f libaudio_client.so
+	rm -f libamlhalaudio.so
 	rm -f $(TARGET_DIR)/usr/bin/audio_server
 	rm -f $(TARGET_DIR)/usr/bin/audio_client_test
 	rm -f $(TARGET_DIR)/usr/bin/audio_client_test_ac3
@@ -171,6 +184,7 @@ clean:
 	rm -f $(TARGET_DIR)/usr/bin/hal_capture
 	rm -f $(TARGET_DIR)/usr/bin/speaker_delay
 	rm -f $(TARGET_DIR)/usr/bin/digital_mode
+	rm -f $(TARGET_DIR)/usr/bin/AML_HAL_Audio
 	rm -f $(TARGET_DIR)/usr/bin/test_arc
 	rm -f $(TARGET_DIR)/usr/bin/start_arc
 	rm -f $(TARGET_DIR)/usr/bin/hal_param
@@ -180,7 +194,9 @@ clean:
 	rm -f $(TARGET_DIR)/usr/bin/effect_tool
 	rm -f $(TARGET_DIR)/usr/lib/libaudio_client.so
 	rm -f $(STAGING_DIR)/usr/lib/libaudio_client.so
+	rm -f $(TARGET_DIR)/usr/lib/libamlhalaudio.so
+	rm -f $(STAGING_DIR)/usr/lib/libamlhalaudio.so
 	rm -f $(STAGING_DIR)/usr/include/audio_if_client.h
 	rm -f $(STAGING_DIR)/usr/include/audio_effect_if.h
 	rm -f $(STAGING_DIR)/usr/include/audio_effect_params.h
-
+	rm -f $(STAGING_DIR)/usr/include/AML_HAL_Audio.h
