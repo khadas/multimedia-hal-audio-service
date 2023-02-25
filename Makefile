@@ -3,7 +3,7 @@ PROTO_OBJS+=$(PROTO_SRCS:.cc=.o)
 
 SERVER_OBJS=src/audio_server.o src/audio_if.o
 CLIENT_OBJS=src/audio_client.o src/audio_if_client.o
-HAL_APLUG_OBJS = hal_aplug/hal_aplug.o
+#HAL_APLUG_OBJS = hal_aplug/hal_aplug.o
 
 SERVER_OBJS+=$(COMMON_OBJS) $(PROTO_OBJS)
 CLIENT_OBJS+=$(COMMON_OBJS) $(PROTO_OBJS)
@@ -69,7 +69,7 @@ audio_server: $(SERVER_OBJS)
 libaudio_client.so: $(CLIENT_OBJS)
 	$(CC) $(CFLAGS) $(SC_LDFLAGS) -shared -o $@ $^
 
-libasound_module_pcm_ahal.so: $(HAL_APLUG_OBJS) libaudio_client.so
+libasound_module_pcm_ahal.so: libaudio_client.so
 	$(CC) $(CFLAGS) $(SC_LDFLAGS) -lasound -shared -o $@ $^
 
 audio_client_test: $(TEST_PCM_OBJS) libaudio_client.so
