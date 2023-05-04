@@ -1064,15 +1064,28 @@ static int daemonize()
 
 void handler(int sig)
 {
-  void *array[10];
-  size_t size;
+  void *array[100];
+  size_t size, i = 0;
+  char ** trace;
 
   // get void*'s for all entries on the stack
-  size = backtrace(array, 10);
+  size = backtrace(array, 100);
 
   // print out all the frames to stderr
-  fprintf(stderr, "Error: signal %d:\n", sig);
-  backtrace_symbols_fd(array, size, STDERR_FILENO);
+  fprintf(stderr, "Error: signal %d, size %d\n", sig, size);
+  ALOGE("Error: signal %d, size %d", sig, size);
+  trace = backtrace_symbols(array, size);
+
+  if (trace) {
+    for (i = 0; i < size; i++) {
+      ALOGE("%s", trace[i]);
+      fprintf(stderr, "%s\n", trace[i]);
+    }
+  } else {
+    fprintf(stderr, "backtrace symbols error!!!\n");
+    ALOGE("backtrace symbols error!!!");
+  }
+
   exit(1);
 }
 
@@ -1082,9 +1095,9 @@ int main(int argc, char** argv)
   if (r < 0)
     return r;
 
-  //signal(SIGSEGV, handler);
-  //signal(SIGABRT, handler);
-  //signal(SIGFPE, handler);
+  signal(SIGSEGV, handler);
+  signal(SIGABRT, handler);
+  signal(SIGFPE, handler);
 
   RunServer();
   return 0;
