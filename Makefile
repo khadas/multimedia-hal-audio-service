@@ -2,12 +2,18 @@ PROTO_SRCS=src/audio_service.grpc.pb.cc src/audio_service.pb.cc
 PROTO_OBJS+=$(PROTO_SRCS:.cc=.o)
 
 SERVER_OBJS=src/audio_server.o src/audio_if.o
+
+ifeq ($(rm_audioserver),y)
+CLIENT_OBJS=src/audio_if.o
+CLIENT_OBJS+=$(COMMON_OBJS)
+else
 CLIENT_OBJS=src/audio_client.o src/audio_if_client.o
+CLIENT_OBJS+=$(COMMON_OBJS) $(PROTO_OBJS)
+endif
 #HAL_APLUG_OBJS = hal_aplug/hal_aplug.o
 
 SERVER_OBJS+=$(COMMON_OBJS) $(PROTO_OBJS)
-CLIENT_OBJS+=$(COMMON_OBJS) $(PROTO_OBJS)
-AMLHALAUDIO_OBJS = src/AML_HAL_Audio.o
+
 
 TEST_PCM_OBJS=src/test.o
 TEST_DOLBY_OBJS=src/test_ac3.o
@@ -57,19 +63,28 @@ src/audio_server.cpp: src/audio_service.pb.h src/audio_service.grpc.pb.cc
 src/audio_client.cpp: src/audio_service.pb.h src/audio_service.grpc.pb.cc
 src/audio_if_client.cpp: src/audio_service.pb.h src/audio_service.grpc.pb.cc
 
-obj= audio_server libaudio_client.so audio_client_test audio_client_test_ac3 halplay hal_capture dap_setting speaker_delay digital_mode libamlhalaudio.so test_amlhalaudio test_arc start_arc hal_param hal_dump hal_patch master_vol effect_tool
+ifeq ($(rm_audioserver),y)
+obj= libaudio_client.so audio_client_test audio_client_test_ac3 halplay hal_capture dap_setting speaker_delay digital_mode test_arc start_arc hal_param hal_dump hal_patch master_vol
+else
+obj= audio_server libaudio_client.so audio_client_test audio_client_test_ac3 halplay hal_capture dap_setting speaker_delay digital_mode test_arc start_arc hal_param hal_dump hal_patch master_vol effect_tool
+endif
+
 ifeq ($(aplugin),y)
 	obj+= libasound_module_pcm_ahal.so
 endif
 
 all:$(obj)
 
-
+ifeq ($(rm_audioserver),y)
+libaudio_client.so: $(CLIENT_OBJS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -shared -o $@ $^
+else
 audio_server: $(SERVER_OBJS)
 	$(CC) $(CFLAGS) $(SC_LDFLAGS) -o $@ $^
 
 libaudio_client.so: $(CLIENT_OBJS)
 	$(CC) $(CFLAGS) $(SC_LDFLAGS) -shared -o $@ $^
+endif
 
 libasound_module_pcm_ahal.so: libaudio_client.so
 	$(CC) $(CFLAGS) $(SC_LDFLAGS) -lasound -shared -o $@ $^
@@ -119,14 +134,19 @@ hal_patch: $(TEST_HAL_PATCH_OBJS) libaudio_client.so
 master_vol: $(TEST_MASTER_VOL_OBJS) libaudio_client.so
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
 
+ifneq ($(rm_audioserver),y)
 effect_tool: $(EFFECT_TOOL_OBJS) libaudio_client.so
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
+endif
 
 .PHONY: install
 install:
+ifneq ($(rm_audioserver),y)
 	install -m 755 -D audio_server -t $(TARGET_DIR)/usr/bin/
 	install -m 755 -D audio_client_test -t $(TARGET_DIR)/usr/bin/
 	install -m 755 -D audio_client_test_ac3 $(TARGET_DIR)/usr/bin/
+	install -m 755 -D effect_tool $(TARGET_DIR)/usr/bin/
+endif
 	install -m 755 -D halplay $(TARGET_DIR)/usr/bin/
 	install -m 755 -D hal_capture $(TARGET_DIR)/usr/bin/
 	install -m 755 -D dap_setting $(TARGET_DIR)/usr/bin/
@@ -138,8 +158,6 @@ install:
 	install -m 755 -D hal_dump $(TARGET_DIR)/usr/bin/
 	install -m 755 -D hal_patch $(TARGET_DIR)/usr/bin/
 	install -m 755 -D master_vol $(TARGET_DIR)/usr/bin/
-	install -m 755 -D effect_tool $(TARGET_DIR)/usr/bin/
-	install -m 755 -D test_amlhalaudio $(TARGET_DIR)/usr/bin/
 	install -m 644 -D libaudio_client.so -t $(TARGET_DIR)/usr/lib/
 	install -m 644 -D libamlhalaudio.so -t $(TARGET_DIR)/usr/lib/
 	install -m 644 -D libamlhalaudio.so -t $(STAGING_DIR)/usr/lib/
