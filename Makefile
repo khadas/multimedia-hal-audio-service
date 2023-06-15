@@ -1,19 +1,33 @@
 PROTO_SRCS=src/audio_service.grpc.pb.cc src/audio_service.pb.cc
 PROTO_OBJS+=$(PROTO_SRCS:.cc=.o)
 
+SHARED_BINDER_OBJS=src/binder/common.o
+
+ifeq ($(use_binder),y)
+SERVER_OBJS=src/audio_if.o src/binder/main_audio_service_binder.o src/binder/audio_service_binder.o src/binder/service_death_recipient.o
+else
 SERVER_OBJS=src/audio_server.o src/audio_if.o
+endif
 
 ifeq ($(rm_audioserver),y)
 CLIENT_OBJS=src/audio_if.o
-CLIENT_OBJS+=$(COMMON_OBJS)
+else
+ifeq ($(use_binder),y)
+CLIENT_OBJS=src/binder/audio_client_binder.o src/binder/audio_if_client_binder.o src/binder/client_death_recipient.o
+CLIENT_OBJS+=$(SHARED_BINDER_OBJS)
 else
 CLIENT_OBJS=src/audio_client.o src/audio_if_client.o
-CLIENT_OBJS+=$(COMMON_OBJS) $(PROTO_OBJS)
+CLIENT_OBJS+=$(PROTO_OBJS)
+endif
 endif
 #HAL_APLUG_OBJS = hal_aplug/hal_aplug.o
 AMLAUDIOSET_OBJS = src/AML_Audio_Setting.o
-SERVER_OBJS+=$(COMMON_OBJS) $(PROTO_OBJS)
 
+ifeq ($(use_binder),y)
+SERVER_OBJS+=$(SHARED_BINDER_OBJS)
+else
+SERVER_OBJS+=$(PROTO_OBJS)
+endif
 
 TEST_PCM_OBJS=src/test.o
 TEST_DOLBY_OBJS=src/test_ac3.o
@@ -31,18 +45,25 @@ TEST_HAL_DUMP_OBJS=src/hal_dump.o
 TEST_HAL_PATCH_OBJS=src/hal_patch.o
 TEST_MASTER_VOL_OBJS=src/master_vol.o
 EFFECT_TOOL_OBJS=src/effect_tool.o
+TEST_AUDIO_CLIENT_BINDER_OBJS=src/binder/audio_client_binder_test.o
 
 PROTOC=$(HOST_DIR)/bin/protoc
 PROTOC_INC=$(HOST_DIR)/include
 GRPC_CPP_PLUGIN_PATH=$(HOST_DIR)/bin/grpc_cpp_plugin
 
-CFLAGS+=-fPIC -O2 -I$(PROTOC_INC) -I./include -I. -I./src
+CFLAGS += -Wall -fPIC -O2 -I$(PROTOC_INC) -I./include -I. -I./src
 ifeq ($(aplugin),y)
 	CFLAGS+= -DPIC
 endif
-CXXFLAGS+=-std=c++14
+CXXFLAGS += -Wall -std=c++14
+
+ifeq ($(use_binder),y)
+SC_LDFLAGS+=-Wl,--no-as-needed -lbinder -lamaudioutils -llog -ldl -lrt -lpthread -lstdc++ -pthread
+LDFLAGS+= -Wl,--no-as-needed -lbinder -llog -ldl -lrt -lpthread -lstdc++ -pthread
+else
 SC_LDFLAGS+=-Wl,--no-as-needed -lgrpc++_unsecure -lprotobuf -lboost_system -lamaudioutils -llog -ldl -lrt -lpthread -lstdc++ -pthread
 LDFLAGS+= -Wl,--no-as-needed -llog -ldl -lrt -lpthread -lstdc++ -pthread
+endif
 
 %.grpc.pb.cc %.grpc.pb.h: %.proto
 	$(PROTOC) -I=. -I=$(PROTOC_INC) --grpc_out=. --plugin=protoc-gen-grpc=$(GRPC_CPP_PLUGIN_PATH) $<
@@ -67,7 +88,11 @@ src/audio_if_client.cpp: src/audio_service.pb.h src/audio_service.grpc.pb.cc
 ifeq ($(rm_audioserver),y)
 obj= libaudio_client.so libamlaudiosetting.so audio_client_test audio_client_test_ac3 halplay hal_capture dap_setting speaker_delay digital_mode test_arc start_arc hal_param hal_dump hal_patch master_vol test_audiosetting
 else
+ifeq ($(use_binder),y)
+obj= audio_server libaudio_client.so audio_client_test audio_client_test_ac3 audio_client_binder_test halplay hal_capture dap_setting speaker_delay digital_mode test_arc start_arc hal_param hal_dump hal_patch master_vol effect_tool
+else
 obj= audio_server libaudio_client.so audio_client_test audio_client_test_ac3 halplay hal_capture dap_setting speaker_delay digital_mode test_arc start_arc hal_param hal_dump hal_patch master_vol effect_tool
+endif
 endif
 
 ifeq ($(aplugin),y)
@@ -135,10 +160,11 @@ hal_patch: $(TEST_HAL_PATCH_OBJS) libaudio_client.so
 master_vol: $(TEST_MASTER_VOL_OBJS) libaudio_client.so
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
 
-ifneq ($(rm_audioserver),y)
 effect_tool: $(EFFECT_TOOL_OBJS) libaudio_client.so
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
-endif
+
+audio_client_binder_test: $(TEST_AUDIO_CLIENT_BINDER_OBJS) libaudio_client.so
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
 
 .PHONY: install
 install:
@@ -152,6 +178,9 @@ else
 	install -m 644 -D libamlaudiosetting.so -t $(STAGING_DIR)/usr/lib/
 	install -m 644 -D libamlaudiosetting.so -t $(TARGET_DIR)/usr/lib/
 	install -m 644 -D include/AML_Audio_Setting.h -t $(STAGING_DIR)/usr/include
+endif
+ifeq ($(use_binder),y)
+	install -m 755 -D audio_client_binder_test -t $(TARGET_DIR)/usr/bin/
 endif
 	install -m 755 -D halplay $(TARGET_DIR)/usr/bin/
 	install -m 755 -D hal_capture $(TARGET_DIR)/usr/bin/
@@ -185,6 +214,9 @@ clean:
 	rm -f audio_server
 	rm -f audio_client_test
 	rm -f audio_client_test_ac3
+ifeq ($(use_binder),y)
+	rm -f audio_client_binder_test
+endif
 	rm -f halplay
 	rm -f hal_capture
 	rm -f test_arc
@@ -200,6 +232,9 @@ clean:
 	rm -f $(TARGET_DIR)/usr/bin/audio_server
 	rm -f $(TARGET_DIR)/usr/bin/audio_client_test
 	rm -f $(TARGET_DIR)/usr/bin/audio_client_test_ac3
+ifeq ($(use_binder),y)
+	rm -f $(TARGET_DIR)/usr/bin/audio_client_binder_test
+endif
 	rm -f $(TARGET_DIR)/usr/bin/halplay
 	rm -f $(TARGET_DIR)/usr/bin/hal_capture
 	rm -f $(TARGET_DIR)/usr/bin/speaker_delay
