@@ -32,6 +32,7 @@ extern "C" {
 
 #define DIGITAL_MODE_CMD "hdmi_format="
 #define TRACK_MODE_CMD "sound_track="
+#define AUDIO_SPDIF_MUTE_CMD "Audio spdif mute="
 
 /** Dolby Lib Type used in Current System */
 typedef enum eDolbyLibType {
@@ -228,6 +229,37 @@ bool AML_HAL_Audio_Get_Mute()
 
     audio_hw_unload_interface(device);
     return mute_state;
+}
+
+bool AML_HAL_Audio_Set_Spdif_Mute(bool mute_flag)
+{
+    int ret;
+    bool bret = true;
+    audio_hw_device_t *device = NULL;
+    char cmd[256] = {0};
+
+    ret = audio_hw_load_interface(&device);
+    if (ret) {
+        printf("audio_hw_load_interface failed: %d\n", ret);
+        return false;
+    }
+
+    ret = device->init_check(device);
+    if (ret) {
+        printf("device not inited, quit\n");
+        audio_hw_unload_interface(device);
+        return false;
+    }
+
+    snprintf(cmd, sizeof(cmd), "%s%d", AUDIO_SPDIF_MUTE_CMD, mute_flag);
+    ret = device->set_parameters(device, cmd);
+    if (ret) {
+        fprintf(stderr, "device->set_parameters: %d\n", ret);
+        bret = false;
+    }
+
+    audio_hw_unload_interface(device);
+    return bret;
 }
 
 bool AML_HAL_Audio_Set_Output_Mode(enum digital_format mode)

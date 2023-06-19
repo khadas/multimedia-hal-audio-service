@@ -104,6 +104,13 @@ bool AML_HAL_Audio_Get_Mute();
 
 
 /**
+ * @brief   Set spdif mute/unmute
+ * @param   flag is a bool type, TRUE means spdif mute and FALSE means unmute
+ * @return  Return bool value, TRUE means setting is successful and FALSE means setting is failed.
+ */
+bool AML_HAL_Audio_Set_Spdif_Mute(bool flag);
+
+/**
 *@brief     Set audio output mode
 *@param     Set the value of the output mode,value is a enum digital_format type
 *@return    Return bool type value,TRUE is setting successful and FALSE is setting failed
