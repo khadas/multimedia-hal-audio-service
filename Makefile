@@ -11,7 +11,7 @@ CLIENT_OBJS=src/audio_client.o src/audio_if_client.o
 CLIENT_OBJS+=$(COMMON_OBJS) $(PROTO_OBJS)
 endif
 #HAL_APLUG_OBJS = hal_aplug/hal_aplug.o
-
+AMLAUDIOSET_OBJS = src/AML_Audio_Setting.o
 SERVER_OBJS+=$(COMMON_OBJS) $(PROTO_OBJS)
 
 
@@ -20,6 +20,7 @@ TEST_DOLBY_OBJS=src/test_ac3.o
 TEST_HALPLAY_OBJS=src/halplay.o
 TEST_HALCAPTURE_OBJS=src/hal_capture.o
 TEST_AMLAUDIOHAL_OBJS=src/test_amlaudiohal.o
+TEST_AUDIOSET_OBJS=src/test_audiosetting.o
 TEST_MS12_OBJS=src/dap_setting.o
 TEST_SPEAKER_DELAY_OBJS=src/speaker_delay.o
 TEST_DIGITAL_MODE_OBJS=src/digital_mode.o
@@ -64,7 +65,7 @@ src/audio_client.cpp: src/audio_service.pb.h src/audio_service.grpc.pb.cc
 src/audio_if_client.cpp: src/audio_service.pb.h src/audio_service.grpc.pb.cc
 
 ifeq ($(rm_audioserver),y)
-obj= libaudio_client.so audio_client_test audio_client_test_ac3 halplay hal_capture dap_setting speaker_delay digital_mode test_arc start_arc hal_param hal_dump hal_patch master_vol
+obj= libaudio_client.so libamlaudiosetting.so audio_client_test audio_client_test_ac3 halplay hal_capture dap_setting speaker_delay digital_mode test_arc start_arc hal_param hal_dump hal_patch master_vol test_audiosetting
 else
 obj= audio_server libaudio_client.so audio_client_test audio_client_test_ac3 halplay hal_capture dap_setting speaker_delay digital_mode test_arc start_arc hal_param hal_dump hal_patch master_vol effect_tool
 endif
@@ -78,6 +79,12 @@ all:$(obj)
 ifeq ($(rm_audioserver),y)
 libaudio_client.so: $(CLIENT_OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -shared -o $@ $^
+
+libamlaudiosetting.so:$(AMLAUDIOSET_OBJS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -shared -o $@ $^
+
+test_audiosetting: $(TEST_AUDIOSET_OBJS) libamlaudiosetting.so
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
 else
 audio_server: $(SERVER_OBJS)
 	$(CC) $(CFLAGS) $(SC_LDFLAGS) -o $@ $^
@@ -140,6 +147,11 @@ ifneq ($(rm_audioserver),y)
 	install -m 755 -D audio_client_test -t $(TARGET_DIR)/usr/bin/
 	install -m 755 -D audio_client_test_ac3 $(TARGET_DIR)/usr/bin/
 	install -m 755 -D effect_tool $(TARGET_DIR)/usr/bin/
+else
+	install -m 755 -D test_audiosetting -t $(TARGET_DIR)/usr/bin/
+	install -m 644 -D libamlaudiosetting.so -t $(STAGING_DIR)/usr/lib/
+	install -m 644 -D libamlaudiosetting.so -t $(TARGET_DIR)/usr/lib/
+	install -m 644 -D include/AML_Audio_Setting.h -t $(STAGING_DIR)/usr/include
 endif
 	install -m 755 -D halplay $(TARGET_DIR)/usr/bin/
 	install -m 755 -D hal_capture $(TARGET_DIR)/usr/bin/

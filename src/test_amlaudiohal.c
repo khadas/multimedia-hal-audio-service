@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 Amlogic Corporation.
+ * Copyright (C) 2023 Amlogic Corporation.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -47,30 +47,23 @@ int main(int argc, char **argv)
     } else if (!strncmp("vol_g", argv[1], sizeof("vol_g"))) {
         vol = AML_HAL_Audio_Get_Volume();
         printf("Audio_Get_Volume success:vol =%f\n",vol);
-    }
-    else if (!strncmp("m_s", argv[1], sizeof("m_s"))) {
+    } else if (!strncmp("m_s", argv[1], sizeof("m_s"))) {
         ret = atoi(argv[2]);
         AML_HAL_Audio_Set_Mute(ret);
-    }
-    else if (!strncmp("m_g", argv[1], sizeof("m_g"))) {
+    } else if (!strncmp("m_g", argv[1], sizeof("m_g"))) {
         printf("Audio mute state:%d\n", AML_HAL_Audio_Get_Mute());
-    }
-    else if (!strncmp("outmode_s", argv[1], sizeof("outmode_s"))) {
+    } else if (!strncmp("outmode_s", argv[1], sizeof("outmode_s"))) {
         ret = atoi(argv[2]);
         printf("dig_mode_set:mode=%d\n",ret);
         AML_HAL_Audio_Set_Output_Mode(ret);
-    }
-    else if (!strncmp("outmode_g", argv[1], sizeof("outmode_g"))) {
+    } else if (!strncmp("outmode_g", argv[1], sizeof("outmode_g"))) {
         printf("output mode = %d\n", AML_HAL_Audio_Get_Output_Mode());
-    }
-    else if (!strncmp("decoder", argv[1], sizeof("decoder"))) {
+    } else if (!strncmp("decoder", argv[1], sizeof("decoder"))) {
         ret = atoi(argv[2]);
         printf("AML_decode_type=%d\n", AML_HAL_Audio_Get_Decode_Type(ret));
-    }
-    else if (!strncmp("caps", argv[1], sizeof("caps"))) {
+    } else if (!strncmp("caps", argv[1], sizeof("caps"))) {
         printf("Capability=0x%x\n", AML_HAL_Audio_Capabilities_Get());
-    }
-    else if (!strncmp("trackmode", argv[1], sizeof("trackmode"))) {
+    } else if (!strncmp("trackmode", argv[1], sizeof("trackmode"))) {
         ret = atoi(argv[2]);
         printf("track_mode_set:mode=%d\n",ret);
         AML_HAL_Audio_Set_Track_Mode(ret);
