@@ -1140,12 +1140,12 @@ static int Virtualx_effect_func(int gParamIndex, int gParamValue, float gParamSc
             return 0;
         case DTS_PARAM_TBHDX_APP_EXTBASS_F32:
             if (gParamScale < 0.0 || gParamScale > 1.0) {
-                LOG("app ettbass = %f invalid\n",gParamScale);
+                LOG("app extbass = %f invalid\n",gParamScale);
                 return -1;
             }
             gVirtualxParam[gParamIndex].f = gParamScale;
             audio_effect_set_parameters(AML_EFFECT_VIRTUALX, &gVirtualxParam[gParamIndex].param);
-            LOG("app ettbass is %f, [0x%08X]\n",
+            LOG("app extbass is %f, [0x%08X]\n",
                 gVirtualxParam[gParamIndex].f, FLOAT2INT(gVirtualxParam[gParamIndex].f));
             return 0;
         case DTS_PARAM_MBHL_APP_FRT_LOWCROSS_F32:
@@ -1239,7 +1239,7 @@ static int Virtualx_effect_func(int gParamIndex, int gParamValue, float gParamSc
             }
             gVirtualxParam[gParamIndex].v = gParamValue;
             audio_effect_set_parameters(AML_EFFECT_VIRTUALX, &gVirtualxParam[gParamIndex].param);
-            LOG("aeq diacard is %d",gVirtualxParam[gParamIndex].v);
+            LOG("aeq discard is %d",gVirtualxParam[gParamIndex].v);
             return 0;
         case DTS_PARAM_AEQ_INPUT_GAIN_I16:
             if (gParamScale < 0 || gParamScale > 1.0) {
@@ -1336,7 +1336,7 @@ int GetIntData (int *data)
     int status = scanf("%d", data);
     if (status == 0) {
         scanf("%*s");
-        LOG("Erorr input! Pls Retry!\n");
+        LOG("Error input! Pls Retry!\n");
         return -1;
     }
     return 0;
@@ -1347,7 +1347,7 @@ int GetFloatData (float *data)
     if (status == 0) {
         int status_temp = scanf("%*s");
         if (status_temp < 0)
-            LOG("Erorr input! Pls Retry!\n");
+            LOG("Error input! Pls Retry!\n");
         return -1;
     }
     return 0;
