@@ -39,6 +39,7 @@ enum audio_format {
     FORMAT_AAC,
     FORMAT_OGG,
     FORMAT_FLAC,
+    FORMAT_TRUE_HD,
     FORMAT_MAX
 };
 
@@ -52,7 +53,8 @@ static int format_tab[] = {
     AUDIO_FORMAT_MP3,
     AUDIO_FORMAT_AAC,
     AUDIO_FORMAT_VORBIS,
-    AUDIO_FORMAT_FLAC
+    AUDIO_FORMAT_FLAC,
+    AUDIO_FORMAT_DOLBY_TRUEHD
 };
 
 static const char *format_str[] = {
@@ -65,7 +67,8 @@ static const char *format_str[] = {
     "MP3",
     "AAC",
     "OGG",
-    "FLAC"
+    "FLAC",
+    "TRUE_HD"
 };
 
 static int format_is_pcm(int format)
@@ -206,7 +209,7 @@ int main(int argc, char **argv)
         printf("-f,           sample format\n");
         printf("-c,           channels\n");
         printf("-r,           sample rate\n");
-        printf("Recognized sample formats are: 0:PCM16 1:PCM32 2:DD 3:MAT 4:IEC61937 5:AC4 6:MP3 7:AAC 8:OGG 9:FLAC\n");
+        printf("Recognized sample formats are: 0:PCM16 1:PCM32 2:DD 3:MAT 4:IEC61937 5:AC4 6:MP3 7:AAC 8:OGG 9:FLAC 10:true-hd\n");
         printf("Some of these may not be available on selected format\n");
         printf("the available params for PCM16 and PCM32 are:\n");
         printf("-c 1,2,6,8\n");
@@ -313,6 +316,17 @@ int main(int argc, char **argv)
         case FORMAT_FLAC:
             config.sample_rate = sr;
             config.channel_mask = AUDIO_CHANNEL_OUT_STEREO;
+            break;
+        case FORMAT_TRUE_HD:
+            config.sample_rate = sr;
+            switch (ch) {
+                case 8:
+                    config.channel_mask = AUDIO_CHANNEL_OUT_7POINT1;
+                    break;
+                default:
+                    config.channel_mask = AUDIO_CHANNEL_OUT_STEREO;
+                    break;
+            }
             break;
 
         default:
