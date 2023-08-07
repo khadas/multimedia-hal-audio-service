@@ -42,6 +42,9 @@
 #define TLV_HEADER_SIZE (2 * sizeof(unsigned int))
 
 #define TDMB_GAIN "TDMOUT_B Software Gain"
+#define TDMA_GAIN "TDMOUT_A Software Gain"
+#define AML_CHIP_ID "AML chip id"
+#define AML_CHIP_ID_S1A 69
 #define HDMI_OUT_MUTE "Audio hdmi-out mute"
 #define DAC_DIGITAL_VOLUME "DAC Digital Playback Volume"
 #define DAC_DIGITAl_DEFAULT_VOLUME          (251)
@@ -79,6 +82,7 @@ enum mixer_ctl_type {
 
 static pthread_mutex_t g_volume_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t g_mute_lock = PTHREAD_MUTEX_INITIALIZER;
+static int chip_id = 0;
 
 static void _mixer_close(struct mixer *mixer)
 {
@@ -727,8 +731,14 @@ int aml_audio_set_volume(int value)
     }
 
     pthread_mutex_lock(&g_volume_lock);
-    ret = aml_audio_mixer_int(TDMB_GAIN, value, true);
-    ALOGD("[%s:%d] volume: %d, ret: %d", __func__, __LINE__, value, ret);
+    chip_id = aml_audio_mixer_int(AML_CHIP_ID, 0, false);
+    /*s1a use TDM-A as cvbs/hdmi_tx samesource*/
+    if (AML_CHIP_ID_S1A == chip_id)
+        ret = aml_audio_mixer_int(TDMA_GAIN, value, true);
+    else
+        ret = aml_audio_mixer_int(TDMB_GAIN, value, true);
+
+    ALOGD("[%s:%d] chip_id: %d, volume: %d, ret: %d", __func__, __LINE__, chip_id, value, ret);
     pthread_mutex_unlock(&g_volume_lock);
 
     return ret;
@@ -738,8 +748,11 @@ int aml_audio_get_volume()
 {
     pthread_mutex_lock(&g_volume_lock);
     int ret = 0;
-    ret = aml_audio_mixer_int(TDMB_GAIN, 0, false);
-    ALOGD("[%s:%d] volume: %d", __func__, __LINE__, ret);
+    if (AML_CHIP_ID_S1A == chip_id)
+        ret = aml_audio_mixer_int(TDMA_GAIN, 0, false);
+    else
+        ret = aml_audio_mixer_int(TDMB_GAIN, 0, false);
+    ALOGD("[%s:%d] chip_id: %d, volume: %d", __func__, __LINE__, chip_id, ret);
     pthread_mutex_unlock(&g_volume_lock);
 
     return ret;
