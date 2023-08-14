@@ -24,15 +24,24 @@
 #include "audio_effect_if.h"
 #include "common.h"
 
-typedef std::pair<void*, struct audio_stream_out*> streamout_data_t;
-typedef std::pair<const int, streamout_data_t> streamout_map_t;
+typedef struct audio_stream_out_info {
+    char name[32];
+    struct audio_stream_out* stream_out_hw;
+    int fd;
+    void* shm;
+} audio_stream_out_info_t;
 
-typedef std::pair<void*, struct audio_stream_in*> streamin_data_t;
-typedef std::pair<const int, streamin_data_t> streamin_map_t;
+typedef struct audio_stream_in_info {
+    char name[32];
+    struct audio_stream_in* stream_in_hw;
+    int fd;
+    void* shm;
+} audio_stream_in_info_t;
 
 class ServiceDeathRecipient;
 
-typedef std::pair<::android::sp<ServiceDeathRecipient>, std::map<const std::string, stream_t> > gc_stream_map_t;
+typedef std::pair<audio_stream_direction, void*> stream_data_t;
+typedef std::pair<::android::sp<ServiceDeathRecipient>, std::unordered_map<std::string, stream_data_t> > gc_stream_map_t;
 
 class AudioServiceBinder : public ::android::BBinder {
     public:
@@ -50,14 +59,8 @@ class AudioServiceBinder : public ::android::BBinder {
         struct audio_hw_device* dev_;
         audio_effect_t* effect_;
 
-        static std::mutex map_out_mutex_;
-        std::map<const std::string, streamout_map_t> streamout_map_;
-
-        static std::mutex map_in_mutex_;
-        std::map<const std::string, streamin_map_t> streamin_map_;
-
         static std::mutex gc_map_mutex_;
-        std::map<int, gc_stream_map_t> gc_stream_map_;
+        std::unordered_map<int, gc_stream_map_t> gc_stream_map_;
 
         std::unordered_set<audio_patch_handle_t> audioPatchHandles;
 
@@ -118,8 +121,10 @@ class AudioServiceBinder : public ::android::BBinder {
                                     audio_output_flags_t flags,
                                     struct audio_config& config,
                                     const char* address,
-                                    int& clientId);
-        void Device_close_output_stream(const char* name);
+                                    int& clientId,
+                                    struct audio_stream*& stream_hw,
+                                    audio_stream_out_info_t*& stream_out_info);
+        void Device_close_output_stream(audio_stream_out_info_t* stream_out_info);
 
         // This method creates and opens the audio hardware input stream
         int Device_open_input_stream(::android::sp<::android::IBinder> audioClientBinder,
@@ -130,8 +135,10 @@ class AudioServiceBinder : public ::android::BBinder {
                                 audio_input_flags_t flags,
                                 const char* address,
                                 audio_source_t source,
-                                int& clientId);
-        void Device_close_input_stream(const char* name);
+                                int& clientId,
+                                struct audio_stream*& stream_hw,
+                                audio_stream_in_info_t*& stream_in_info);
+        void Device_close_input_stream(audio_stream_in_info_t* stream_in_info);
 
         int Device_dump(std::string& deviceDump);
 
@@ -159,26 +166,26 @@ class AudioServiceBinder : public ::android::BBinder {
         ////////////////////////////
 
         // Return the sampling rate in Hz - eg. 44100.
-        uint32_t Stream_get_sample_rate(const char* name);
+        uint32_t Stream_get_sample_rate(struct audio_stream* stream_hw);
 
         // Return size of input/output buffer in bytes for this stream - eg. 4800.
         // It should be a multiple of the frame size.  See also get_input_buffer_size.
-        size_t Stream_get_buffer_size(const char* name);
+        size_t Stream_get_buffer_size(struct audio_stream* stream_hw);
 
         // Return the channel mask -
         //  e.g. AUDIO_CHANNEL_OUT_STEREO or AUDIO_CHANNEL_IN_STEREO
-        uint32_t Stream_get_channels(const char* name);
+        uint32_t Stream_get_channels(struct audio_stream* stream_hw);
 
         // Return the audio format - e.g. AUDIO_FORMAT_PCM_16_BIT
-        int Stream_get_format(const char* name);
+        int Stream_get_format(struct audio_stream* stream_hw);
 
         // Put the audio hardware input/output into standby mode.
         // Driver should exit from standby mode at the next I/O operation.
         // Returns 0 on success and <0 on failure.
-        uint32_t Stream_standby(const char* name);
+        uint32_t Stream_standby(struct audio_stream* stream_hw);
 
         // Return the set of device(s) which this stream is connected to
-        uint32_t Stream_get_device(const char* name);
+        uint32_t Stream_get_device(struct audio_stream* stream_hw);
 
         // set/get audio stream parameters. The function accepts a list of
         // parameter key value pairs in the form: key1=value1;key2=value2;...
@@ -191,23 +198,23 @@ class AudioServiceBinder : public ::android::BBinder {
         //
         // The audio flinger will put the stream in standby and then change the
         // parameter value.
-        int Stream_set_parameters(const char* name, const char* kv_pairs);
+        int Stream_set_parameters(struct audio_stream* stream_hw, const char* kv_pairs);
 
-        char* Stream_get_parameters(const char* name, const char* keys);
+        char* Stream_get_parameters(struct audio_stream* stream_hw, const char* keys);
 
         ////////////////////////////
         // Stream Out API
         ////////////////////////////
 
         // Return the audio hardware driver estimated latency in milliseconds.
-        uint32_t StreamOut_get_latency(const char* name);
+        uint32_t StreamOut_get_latency(struct audio_stream_out* stream_out_hw);
 
         // Use this method in situations where audio mixing is done in the
         // hardware. This method serves as a direct interface with hardware,
         // allowing you to directly set the volume as apposed to via the framework.
         // This method might produce multiple PCM outputs or hardware accelerated
         // codecs, such as MP3 or AAC.
-        int StreamOut_set_volume(const char* name, float left, float right);
+        int StreamOut_set_volume(struct audio_stream_out* stream_out_hw, float left, float right);
 
         // Write audio buffer to driver. Returns number of bytes written, or a
         // negative status_t. If at least one frame was written successfully prior to the error,
@@ -220,15 +227,15 @@ class AudioServiceBinder : public ::android::BBinder {
         // this byte count. If this is less than the requested write size the
         // callback function must be called when more space is available in the
         // driver/hardware buffer.
-        ssize_t StreamOut_write(const char* name, size_t bytes);
+        ssize_t StreamOut_write(audio_stream_out_info_t* stream_out_info, size_t bytes);
 
         // return the number of audio frames written by the audio dsp to DAC since
         // the output has exited standby
-        int StreamOut_get_render_position(const char* name, uint32_t& dsp_frames);
+        int StreamOut_get_render_position(struct audio_stream_out* stream_out_hw, uint32_t& dsp_frames);
 
         // get the local time at which the next write to the audio driver will be presented.
         // The units are microseconds, where the epoch is decided by the local audio HAL.
-        int StreamOut_get_next_write_timestamp(const char* name, int64_t& timestamp);
+        int StreamOut_get_next_write_timestamp(struct audio_stream_out* stream_out_hw, int64_t& timestamp);
 
         // Notifies to the audio driver to stop playback however the queued buffers are
         // retained by the hardware. Useful for implementing pause/resume. Empty implementation
@@ -237,19 +244,19 @@ class AudioServiceBinder : public ::android::BBinder {
         // consider calling suspend after a timeout.
         //
         // Implementation of this function is mandatory for offloaded playback.
-        int StreamOut_pause(const char* name);
+        int StreamOut_pause(struct audio_stream_out* stream_out_hw);
 
         // Notifies to the audio driver to resume playback following a pause.
         // Returns error if called without matching pause.
         //
         // Implementation of this function is mandatory for offloaded playback.
-        int StreamOut_resume(const char* name);
+        int StreamOut_resume(struct audio_stream_out* stream_out_hw);
 
         // Notifies to the audio driver to flush the queued data. Stream must already
         // be paused before calling flush().
         //
         // Implementation of this function is mandatory for offloaded playback.
-        int StreamOut_flush(const char* name);
+        int StreamOut_flush(struct audio_stream_out* stream_out_hw);
 
         // Return a recent count of the number of audio frames presented to an external observer.
         // This excludes frames which have been written but are still in the pipeline.
@@ -265,7 +272,9 @@ class AudioServiceBinder : public ::android::BBinder {
         // They reflect the quality of the implementation.
         //
         // 3.0 and higher only.
-        int StreamOut_get_presentation_position(const char* name, uint64_t& frames, struct timespec& timestamp);
+        int StreamOut_get_presentation_position(struct audio_stream_out* stream_out_hw,
+                                            uint64_t& frames,
+                                            struct timespec& timestamp);
 
         ////////////////////////////
         // Stream In API
@@ -273,12 +282,12 @@ class AudioServiceBinder : public ::android::BBinder {
         // set the input gain for the audio driver. This method is for
         // for future use */
         // int (*set_gain)(struct audio_stream_in *stream, float gain);
-        int StreamIn_set_gain(const char* name, float gain);
+        int StreamIn_set_gain(struct audio_stream_in* stream_in_hw, float gain);
 
         // Read audio buffer in from audio driver. Returns number of bytes read, or a
         // negative status_t. If at least one frame was read prior to the error,
         // read should return that byte count and then return an error in the subsequent call.
-        int StreamIn_read(const char* name, size_t bytes);
+        int StreamIn_read(audio_stream_in_info_t* stream_in_info, size_t bytes);
 
         // Return the amount of input frames lost in the audio driver since the
         // last call of this function.
@@ -289,7 +298,7 @@ class AudioServiceBinder : public ::android::BBinder {
         //
         // Unit: the number of input audio frames
         // uint32_t (*get_input_frames_lost)(struct audio_stream_in *stream);
-        uint32_t StreamIn_get_input_frames_lost(const char* name);
+        uint32_t StreamIn_get_input_frames_lost(struct audio_stream_in* stream_in_hw);
 
         // Return a recent count of the number of audio frames received and
         // the clock time associated with that frame count.
@@ -303,7 +312,7 @@ class AudioServiceBinder : public ::android::BBinder {
         //
         // The status returned is 0 on success, -ENOSYS if the device is not
         // ready/available, or -EINVAL if the arguments are null or otherwise invalid.
-        int StreamIn_get_capture_position(const char* name, int64_t& frames, int64_t& time);
+        int StreamIn_get_capture_position(struct audio_stream_in* stream_in_hw, int64_t& frames, int64_t& time);
 
         ////////////////////////////
         // Misc API
@@ -328,26 +337,22 @@ class AudioServiceBinder : public ::android::BBinder {
                             void* pReplyData);
 
         // garbage collection
-        void streamout_gc_(const std::string& streamout_name);
-        void streamin_gc_(const std::string& streamin_name);
+        void stream_gc_(const std::unordered_map<std::string, stream_data_t>& streamsInfo);
+        void streamout_gc_(const char* name, int fd, audio_stream_out* stream_out_hw);
+        void streamin_gc_(const char* name, int fd, audio_stream_in* stream_in_hw);
 
         /* helper methods */
-        struct audio_stream* find_stream(const std::string& name,
-                                    const std::map<const std::string, streamout_map_t>& map_out,
-                                    const std::map<const std::string, streamin_map_t>& map_in);
+        int updateStreamOutInfo(const char* name, struct audio_stream_out* stream, audio_stream_out_info_t* stream_out_info);
+        int updateStreamInInfo(const char* name, struct audio_stream_in* stream, audio_stream_in_info_t* stream_in_info);
+        int setShmAndFdForStreamOutInfo(const char* name, audio_stream_out_info_t* stream_out_info);
+        int setShmAndFdForStreamInInfo(const char* name, audio_stream_in_info_t* stream_in_info);
 
-        struct audio_stream_out* find_streamout(const std::string& name, const std::map<const std::string, streamout_map_t>& map_out);
-        struct audio_stream_in* find_streamin(const std::string& name, const std::map<const std::string, streamin_map_t>& map_in);
-
-        void update_gc_stream_map(::android::sp<::android::IBinder> audioClientBinder, int client_id, const std::string& stream_id, stream_t streamType);
+        void update_gc_stream_map(::android::sp<::android::IBinder> audioClientBinder,
+                                int client_id,
+                                const std::string& stream_id,
+                                audio_stream_direction streamDirection,
+                                void* streamInfo);
         void remove_stream_info_from_gc_stream_map(int clientPid, const std::string& name);
-
-        template <typename stream_map_t, typename stream_t> int getStreamShmAndStream(const char* streamLabel,
-                                                                                    const char* name,
-                                                                                    stream_map_t& streamMap,
-                                                                                    void*& shm,
-                                                                                    size_t length,
-                                                                                    stream_t& stream);
 
         void readAudioConfigFromParcel(struct audio_config& config, const ::android::Parcel& parcel);
         void readAudioPortConfigFromParcel(struct audio_port_config& config, const ::android::Parcel& parcel);

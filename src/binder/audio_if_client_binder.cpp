@@ -262,13 +262,13 @@ static int Device_open_output_stream(struct audio_hw_device* dev,
                               struct audio_stream_out** stream_out,
                               const char* address)
 {
-    int r;
-    audio_stream_out_client_t* stream_out_client = (audio_stream_out_client_t*) calloc(1, sizeof(audio_stream_out_client_t));
-    if (!stream_out_client) return -ENOMEM;
+    audio_stream_out_client_t* stream_out_client = nullptr;
 
-    r = client->Device_open_output_stream(handle, devices, flags, config, stream_out_client, address);
+    int r = client->Device_open_output_stream(handle, devices, flags, config, stream_out_client, address);
     if (r) {
-        free(stream_out);
+        if (stream_out_client != nullptr) {
+            delete stream_out_client;
+        }
         return r;
     }
 
@@ -281,7 +281,6 @@ static void Device_close_output_stream(struct audio_hw_device* dev,
                                 struct audio_stream_out* stream_out)
 {
     client->Device_close_output_stream(stream_out);
-    free(audio_stream_out_to_client(stream_out));
 }
 
 static int Device_open_input_stream(struct audio_hw_device *dev,
@@ -293,13 +292,13 @@ static int Device_open_input_stream(struct audio_hw_device *dev,
                              const char *address,
                              audio_source_t source)
 {
-    int r;
-    audio_stream_in_client_t* stream_in_client = (audio_stream_in_client_t*) calloc(1, sizeof(audio_stream_in_client_t));
-    if (!stream_in_client) return -ENOMEM;
+    audio_stream_in_client_t* stream_in_client = nullptr;
 
-    r = client->Device_open_input_stream(handle, devices, config, stream_in_client, flags, address, source);
+    int r = client->Device_open_input_stream(handle, devices, config, stream_in_client, flags, address, source);
     if (r) {
-        free(stream_in_client);
+        if (stream_in_client != nullptr) {
+            delete stream_in_client;
+        }
         return r;
     }
 
@@ -312,14 +311,13 @@ static void Device_close_input_stream(struct audio_hw_device* dev,
                                struct audio_stream_in* stream_in)
 {
     client->Device_close_input_stream(stream_in);
-    free(audio_stream_in_to_client(stream_in));
 }
 
 static char * Device_dump(const struct audio_hw_device *dev, int fd)
 {
     std::string dump;
     client->Device_dump(dump);
-    char *p = (char *)malloc(dump.size() + 1);
+    char *p = static_cast<char*>(malloc(dump.size() + 1));
     if (p) { strcpy(p, dump.c_str()); }
     return p;
 }

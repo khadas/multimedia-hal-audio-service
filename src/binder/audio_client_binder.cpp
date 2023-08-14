@@ -36,7 +36,7 @@
 #define CHK_TRANSACT_RET_AND_RET(tr, l, r) \
     do { \
         if ((tr) != 0) { \
-            if ((tr) == BINDER_EXCEPTION) { std::cout << PROCESS_NAME_LOG << " Service exception." << std::endl; stop_execution(); } \
+            if ((tr) == BINDER_EXCEPTION) { std::cout << PROCESS_NAME_LOG << " Service exception." << std::endl; on_service_exception(); } \
             return (r); \
         } \
     } while (0)
@@ -44,7 +44,7 @@
 #define CHK_TRANSACT_RET(tr, l) \
     do { \
         if ((tr) != 0) { \
-            if ((tr) == BINDER_EXCEPTION) { std::cout << PROCESS_NAME_LOG << " Service exception." << std::endl; stop_execution(); } \
+            if ((tr) == BINDER_EXCEPTION) { std::cout << PROCESS_NAME_LOG << " Service exception." << std::endl; on_service_exception(); } \
             std::cout << PROCESS_NAME_LOG << " Error with transact " << (l) << ". transactRet = " << (tr) << "." << std::endl; \
             return; \
         } \
@@ -56,7 +56,7 @@ namespace acb {
     template<> void writeDataToParcel<float>(const float& data, ::android::Parcel& parcel) { parcel.writeFloat(data); }
     template<> void writeDataToParcel<char*>(char* const& data, ::android::Parcel& parcel) { parcel.writeCString(data); }
     template<> void writeDataToParcel<const char*>(const char* const& data, ::android::Parcel& parcel) { parcel.writeCString(data); }
-    template<> void writeDataToParcel<AudioClientBinder*>(AudioClientBinder* const& data, ::android::Parcel& parcel) { parcel.writeStrongBinder(static_cast<::android::IBinder*>(data)); }
+    template<> void writeDataToParcel<void*>(void* const& data, ::android::Parcel& parcel) { parcel.write(&data, sizeof(data)); }
 
     template<typename R> R readDataFromParcel(const ::android::Parcel& parcel);
     template<> uint32_t readDataFromParcel<uint32_t>(const ::android::Parcel& parcel) { return parcel.readUint32(); }
@@ -66,9 +66,9 @@ namespace acb {
     template<> const char* readDataFromParcel<const char*>(const ::android::Parcel& parcel) { return parcel.readCString(); }
 }
 
-std::mutex AudioClientBinder::map_in_mutex_;
-std::mutex AudioClientBinder::map_out_mutex_;
-std::mutex AudioClientBinder::stop_execution_mutex_;
+std::mutex AudioClientBinder::stream_in_clients_mutex_;
+std::mutex AudioClientBinder::stream_out_clients_mutex_;
+std::mutex AudioClientBinder::on_service_exception_mutex_;
 
 AudioClientBinder::AudioClientBinder() {
     ::android::sp<::android::ProcessState> proc(::android::ProcessState::self());
@@ -103,29 +103,13 @@ void AudioClientBinder::setspInstance(::android::sp<AudioClientBinder> spInstanc
 
 void AudioClientBinder::gc() {
     {
-        std::lock_guard<std::mutex> lock_out(map_out_mutex_);
-
-         for (std::map<const std::string, shm_map_t>::const_iterator it = streamout_map_.begin(); it != streamout_map_.end(); ++it) {
-            const char* name = it->first.c_str();
-            std::cout << PROCESS_NAME_LOG << " " OUTPUT_STREAM_LABEL << " " << name << " was opened." << std::endl;
-            int fd = it->second.first;
-            posixCloseFile(PROCESS_NAME_LOG, OUTPUT_STREAM_LABEL, name, fd);
-        }
-
-        streamout_map_.clear();
+        std::lock_guard<std::mutex> lock_out(stream_out_clients_mutex_);
+        cleanStreamoutClients();
     }
 
     {
-        std::lock_guard<std::mutex> lock_in(map_in_mutex_);
-
-        for (std::map<const std::string, shm_map_t>::const_iterator it = streamin_map_.begin(); it != streamin_map_.end(); ++it) {
-            const char* name = it->first.c_str();
-            std::cout << PROCESS_NAME_LOG << " " INPUT_STREAM_LABEL << " " << name << " was opened." << std::endl;
-            int fd = it->second.first;
-            posixCloseFile(PROCESS_NAME_LOG, OUTPUT_STREAM_LABEL, name, fd);
-        }
-
-        streamin_map_.clear();
+        std::lock_guard<std::mutex> lock_in(stream_in_clients_mutex_);
+        cleanStreaminClients();
     }
 
     if (clientDeathRecipient != nullptr) clientDeathRecipient.clear();
@@ -133,8 +117,8 @@ void AudioClientBinder::gc() {
 
 bool AudioClientBinder::gotService() { return mService; }
 
-void AudioClientBinder::stop_execution() {
-    std::lock_guard<std::mutex> lock(stop_execution_mutex_);
+void AudioClientBinder::on_service_exception() {
+    std::lock_guard<std::mutex> lock(on_service_exception_mutex_);
 
     if (spInstance_ != nullptr) {
         spInstance_->gc();
@@ -190,7 +174,7 @@ char* AudioClientBinder::Device_get_parameters(const char* keys) {
 
     int lenParams = strlen(params);
 
-    char* p = (char*) malloc(lenParams + 1);
+    char* p = static_cast<char*>(malloc(lenParams + 1));
     if (p) {
         strncpy(p, params, lenParams + 1);
     }
@@ -214,15 +198,18 @@ int AudioClientBinder::Device_open_output_stream(audio_io_handle_t handle,
                                             audio_devices_t devices,
                                             audio_output_flags_t flags,
                                             struct audio_config* config,
-                                            audio_stream_out_client_t* stream_out,
+                                            audio_stream_out_client_t*& stream_out_client,
                                             const char* address) {
     CHK_SERVICE_AND_RET(-1);
 
     ::android::Parcel send, reply;
 
+    stream_out_client = new audio_stream_out_client_t;
+    if (!stream_out_client) return -ENOMEM;
+
     send.writeStrongBinder(::android::sp<AudioClientBinder>(this));
 
-    int seq = new_stream_name(stream_out->name, sizeof(stream_out->name));
+    int seq = new_stream_name(stream_out_client->name, sizeof(stream_out_client->name));
     send.writeInt32(seq);
 
     int handleTransact = handle;
@@ -242,42 +229,51 @@ int AudioClientBinder::Device_open_output_stream(audio_io_handle_t handle,
     int transactRet = mAudioServiceBinder->transact(CMD_AS_DOOS, send, &reply);
     CHK_TRANSACT_RET_AND_RET(transactRet, "data for device open output stream", transactRet);
 
-    int clientId = reply.readInt32();
-    update_stream_name(stream_out->name, sizeof(stream_out->name), clientId);
-
-    void* streamoutShm;
-    int fd = posixOpenFileAndMapData(PROCESS_NAME_LOG, OUTPUT_STREAM_LABEL, stream_out->name, O_RDWR, S_IRUSR | S_IWUSR, streamoutShm, KSHAREDBUFFERSIZE, PROT_READ | PROT_WRITE, MAP_SHARED);
-    if (fd == -1) { return -1; }
-
-    {
-        std::lock_guard<std::mutex> lock(map_out_mutex_);
-        streamout_map_.insert(std::pair<const std::string, shm_map_t>(std::string(stream_out->name), shm_map_t(fd, streamoutShm)));
+    int ret = reply.readInt32();
+    if (ret == 0) {
+        if (updateStreamOutClient(reply, stream_out_client) == -1) {
+            return -1;
+        }
+        {
+            std::lock_guard<std::mutex> lock(stream_out_clients_mutex_);
+            streamoutClients.insert(std::pair<std::string, audio_stream_out_client_t*>(std::string(stream_out_client->name), stream_out_client));
+        }
     }
 
-    return reply.readInt32();
+    return ret;
 }
 
 void AudioClientBinder::Device_close_output_stream(struct audio_stream_out* stream_out) {
-    char* name = (audio_stream_out_to_client(stream_out))->name;
-
+    // If streamoutClients is empty, then gc has been executed.
+    // gc is executed if service dies if client is on and has opened stream.
+    // If gc has been executed, then the memory for stream out client has been freed.
     {
-        std::lock_guard<std::mutex> lock(map_out_mutex_);
-
-        std::map<const std::string, shm_map_t>::iterator it = streamout_map_.find(std::string(name));
-        if (it == streamout_map_.end()) { return; }
-
-        int fd = it->second.first;
-        posixCloseFile(PROCESS_NAME_LOG, OUTPUT_STREAM_LABEL, name, fd);
-        streamout_map_.erase(it);
+        std::lock_guard<std::mutex> lock(stream_out_clients_mutex_);
+        if (streamoutClients.empty()) return;
     }
 
-    transactData<const char*>(name, CMD_AS_DCOS, "data for device close output stream");
+    struct audio_stream_out_client* stream_out_client = audio_stream_out_to_client(stream_out);
+
+    const char* name = stream_out_client->name;
+    posixCloseFile(PROCESS_NAME_LOG, OUTPUT_STREAM_LABEL, name, stream_out_client->fd);
+
+    {
+        std::lock_guard<std::mutex> lock(stream_out_clients_mutex_);
+        streamoutClients.erase(std::string(name));
+    }
+
+    transactData<void*>(stream_out_client->stream_out_info, CMD_AS_DCOS, "data for device close output stream");
+
+    if (stream_out_client != nullptr) {
+        delete stream_out_client;
+        stream_out_client = nullptr;
+    }
 }
 
 int AudioClientBinder::Device_open_input_stream(audio_io_handle_t handle,
                                             audio_devices_t devices,
                                             struct audio_config* config,
-                                            struct audio_stream_in_client* stream_in,
+                                            audio_stream_in_client_t*& stream_in_client,
                                             audio_input_flags_t flags,
                                             const char* address,
                                             audio_source_t source) {
@@ -285,9 +281,12 @@ int AudioClientBinder::Device_open_input_stream(audio_io_handle_t handle,
 
     ::android::Parcel send, reply;
 
+    stream_in_client = new audio_stream_in_client_t;
+    if (!stream_in_client) return -ENOMEM;
+
     send.writeStrongBinder(::android::sp<AudioClientBinder>(this));
 
-    int seq = new_stream_name(stream_in->name, sizeof(stream_in->name));
+    int seq = new_stream_name(stream_in_client->name, sizeof(stream_in_client->name));
     send.writeInt32(seq);
 
     int handleTransact = handle;
@@ -309,36 +308,45 @@ int AudioClientBinder::Device_open_input_stream(audio_io_handle_t handle,
     int transactRet = mAudioServiceBinder->transact(CMD_AS_DOIS, send, &reply);
     CHK_TRANSACT_RET_AND_RET(transactRet, "data for device open input stream", transactRet);
 
-    int clientId = reply.readInt32();
-    update_stream_name(stream_in->name, sizeof(stream_in->name), clientId);
-
-    void* streaminShm; int fd;
-    fd = posixOpenFileAndMapData(PROCESS_NAME_LOG, INPUT_STREAM_LABEL, stream_in->name, O_RDWR, S_IRUSR | S_IWUSR, streaminShm, KSHAREDBUFFERSIZE, PROT_READ | PROT_WRITE, MAP_SHARED);
-    if (fd == -1) { return -1; }
-
-    {
-        std::lock_guard<std::mutex> lock(map_in_mutex_);
-        streamin_map_.insert(std::pair<const std::string, shm_map_t>(std::string(stream_in->name), shm_map_t(fd, streaminShm)));
+    int ret = reply.readInt32();
+    if (ret == 0) {
+        if (updateStreamInClient(reply, stream_in_client) == -1) {
+            return -1;
+        }
+        {
+            std::lock_guard<std::mutex> lock(stream_in_clients_mutex_);
+            streaminClients.insert(std::pair<std::string, audio_stream_in_client_t*>(std::string(stream_in_client->name), stream_in_client));
+        }
     }
 
-    return reply.readInt32();
+    return ret;
 }
 
 void AudioClientBinder::Device_close_input_stream(struct audio_stream_in* stream_in) {
-    char* name = (audio_stream_in_to_client(stream_in))->name;
-
+    // If streaminClients is empty, then gc has been executed.
+    // gc is executed if service dies if client is on and has opened stream.
+    // If gc has been executed, then the memory for stream in client has been freed.
     {
-        std::lock_guard<std::mutex> lock(map_in_mutex_);
-
-        std::map<const std::string, shm_map_t>::iterator it = streamin_map_.find(std::string(name));
-        if (it == streamin_map_.end()) { return; }
-
-        int fd = it->second.first;
-        posixCloseFile(PROCESS_NAME_LOG, INPUT_STREAM_LABEL, name, fd);
-        streamin_map_.erase(it);
+        std::lock_guard<std::mutex> lock(stream_in_clients_mutex_);
+        if (streaminClients.empty()) return;
     }
 
-    transactData<const char*>(name, CMD_AS_DCIS, "data for device close input stream");
+    struct audio_stream_in_client* stream_in_client = audio_stream_in_to_client(stream_in);
+
+    const char* name = stream_in_client->name;
+    posixCloseFile(PROCESS_NAME_LOG, INPUT_STREAM_LABEL, name, stream_in_client->fd);
+
+    {
+        std::lock_guard<std::mutex> lock(stream_in_clients_mutex_);
+        streaminClients.erase(std::string(name));
+    }
+
+    transactData<void*>(stream_in_client->stream_in_info, CMD_AS_DCIS, "data for device close input stream");
+
+    if (stream_in_client != nullptr) {
+        delete stream_in_client;
+        stream_in_client = nullptr;
+    }
 }
 
 int AudioClientBinder::Device_dump(std::string& deviceDump) {
@@ -395,23 +403,25 @@ int AudioClientBinder::Device_set_audio_port_config(const struct audio_port_conf
 }
 
 uint32_t AudioClientBinder::Stream_get_sample_rate(const struct audio_stream* stream) {
-    const char* name = (audio_stream_to_client(stream))->name;
-    return transactDataRetNum<const char*, uint32_t>(name, CMD_AS_SGSR, "data for stream get sample rate");
+    void* stream_hw = (audio_stream_to_client(stream))->stream_hw;
+    return transactDataRetNum<void*, uint32_t>(stream_hw, CMD_AS_SGSR, "data for stream get sample rate");
 }
 
 size_t AudioClientBinder::Stream_get_buffer_size(const struct audio_stream* stream) {
-    const char* name = (audio_stream_to_client(stream))->name;
-    return transactDataRetNum<const char*, int>(name, CMD_AS_SGBS, "data for stream get buffer size");
+    void* stream_hw = (audio_stream_to_client(stream))->stream_hw;
+    return transactDataRetNum<void*, int>(stream_hw, CMD_AS_SGBS, "data for stream get buffer size");
 }
 
 audio_channel_mask_t AudioClientBinder::Stream_get_channels(const struct audio_stream* stream) {
     ::android::Parcel send, reply;
 
-    const char* name = (audio_stream_to_client(stream))->name;
-    send.writeCString(name);
+    struct audio_stream_client* stream_client = audio_stream_to_client(stream);
+
+    void* stream_hw = stream_client->stream_hw;
+    send.write(&stream_hw, sizeof(stream_hw));
 
     int transactRet = mAudioServiceBinder->transact(CMD_AS_SGC, send, &reply);
-    if (transactRet == BINDER_EXCEPTION) { std::cout << PROCESS_NAME_LOG << " Service exception." << std::endl; stop_execution(); }
+    if (transactRet == BINDER_EXCEPTION) { std::cout << PROCESS_NAME_LOG << " Service exception." << std::endl; on_service_exception(); }
 
     return (audio_channel_mask_t) reply.readUint32();
 }
@@ -419,23 +429,23 @@ audio_channel_mask_t AudioClientBinder::Stream_get_channels(const struct audio_s
 audio_format_t AudioClientBinder::Stream_get_format(const struct audio_stream* stream) {
     ::android::Parcel send, reply;
 
-    const char* name = (audio_stream_to_client(stream))->name;
-    send.writeCString(name);
+    void* stream_hw = (audio_stream_to_client(stream))->stream_hw;
+    send.write(&stream_hw, sizeof(stream_hw));
 
     int transactRet = mAudioServiceBinder->transact(CMD_AS_SGF, send, &reply);
-    if (transactRet == BINDER_EXCEPTION) { std::cout << PROCESS_NAME_LOG << " Service exception." << std::endl; stop_execution(); }
+    if (transactRet == BINDER_EXCEPTION) { std::cout << PROCESS_NAME_LOG << " Service exception." << std::endl; on_service_exception(); }
 
     return (audio_format_t) reply.readUint32();
 }
 
 int AudioClientBinder::Stream_standby(struct audio_stream* stream) {
-    const char* name = (audio_stream_to_client(stream))->name;
-    return transactDataRetNum<const char*, uint32_t>(name, CMD_AS_SS, "data for stream standby");
+    void* stream_hw = (audio_stream_to_client(stream))->stream_hw;
+    return transactDataRetNum<void*, uint32_t>(stream_hw, CMD_AS_SS, "data for stream standby");
 }
 
 audio_devices_t AudioClientBinder::Stream_get_device(const struct audio_stream* stream) {
-    const char* name = (audio_stream_to_client(stream))->name;
-    return (audio_devices_t) transactDataRetNum<const char*, uint32_t>(name, CMD_AS_SGD, "data for stream get device");
+    void* stream_hw = (audio_stream_to_client(stream))->stream_hw;
+    return (audio_devices_t) transactDataRetNum<void*, uint32_t>(stream_hw, CMD_AS_SGD, "data for stream get device");
 }
 
 int AudioClientBinder::Stream_set_parameters(struct audio_stream* stream, const char* kv_pairs) {
@@ -443,9 +453,9 @@ int AudioClientBinder::Stream_set_parameters(struct audio_stream* stream, const 
 
     ::android::Parcel send, reply;
 
-    const char* name = (audio_stream_to_client(stream))->name;
+    void* stream_hw = (audio_stream_to_client(stream))->stream_hw;
+    send.write(&stream_hw, sizeof(stream_hw));
 
-    send.writeCString(name);
     send.writeCString(kv_pairs);
 
     int transactRet = mAudioServiceBinder->transact(CMD_AS_SSP, send, &reply);
@@ -459,9 +469,9 @@ char* AudioClientBinder::Stream_get_parameters(const struct audio_stream* stream
 
     ::android::Parcel send, reply;
 
-    const char* name = (audio_stream_to_client(stream))->name;
+    void* stream_hw = (audio_stream_to_client(stream))->stream_hw;
+    send.write(&stream_hw, sizeof(stream_hw));
 
-    send.writeCString(name);
     send.writeCString(keys);
 
     int transactRet = mAudioServiceBinder->transact(CMD_AS_SGP, send, &reply);
@@ -472,7 +482,7 @@ char* AudioClientBinder::Stream_get_parameters(const struct audio_stream* stream
 
     int lenParams = strlen(params);
 
-    char* p = (char*) malloc(lenParams + 1);
+    char* p = static_cast<char*>(malloc(lenParams + 1));
     if (p) {
         strncpy(p, params, lenParams + 1);
     }
@@ -480,8 +490,8 @@ char* AudioClientBinder::Stream_get_parameters(const struct audio_stream* stream
 }
 
 uint32_t AudioClientBinder::StreamOut_get_latency(const struct audio_stream_out* stream) {
-    const char* name = (audio_stream_out_to_client(stream))->name;
-    return transactDataRetNum<const char*, uint32_t>(name, CMD_AS_SO_GL, "data for stream out get latency");
+    void* stream_out_info = (audio_stream_out_to_client(stream))->stream_out_info;
+    return transactDataRetNum<void*, uint32_t>(stream_out_info, CMD_AS_SO_GL, "data for stream out get latency");
 }
 
 int AudioClientBinder::StreamOut_set_volume(struct audio_stream_out* stream, float left, float right) {
@@ -489,8 +499,9 @@ int AudioClientBinder::StreamOut_set_volume(struct audio_stream_out* stream, flo
 
     ::android::Parcel send, reply;
 
-    const char* name = (audio_stream_out_to_client(stream))->name;
-    send.writeCString(name);
+    void* stream_out_info = (audio_stream_out_to_client(stream))->stream_out_info;
+    send.write(&stream_out_info, sizeof(stream_out_info));
+
     send.writeFloat(left);
     send.writeFloat(right);
 
@@ -505,14 +516,16 @@ ssize_t AudioClientBinder::StreamOut_write(struct audio_stream_out* stream, cons
 
     ::android::Parcel send, reply;
 
-    const char* name = (audio_stream_out_to_client(stream))->name;
+    struct audio_stream_out_client* stream_out_client = audio_stream_out_to_client(stream);
 
-    void* streamoutShm;
-    if (getStreamShm<std::map<const std::string, shm_map_t> >(OUTPUT_STREAM_LABEL, name, streamout_map_, streamoutShm, KSHAREDBUFFERSIZE) == -1) { return -1; }
+    if (!stream_out_client->shm) {
+        std::cout << PROCESS_NAME_LOG << " Shared memory to " << OUTPUT_STREAM_LABEL << " " << stream_out_client->name << " was not previously allocated on client. Allocating." << std::endl;
+        if (setShmAndFdForStreamOutClient(stream_out_client) == -1) return -1;
+    }
 
-    memcpy(streamoutShm, buffer, std::min(bytes, (size_t) KSHAREDBUFFERSIZE));
+    memcpy(stream_out_client->shm, buffer, std::min(bytes, (size_t) KSHAREDBUFFERSIZE));
 
-    send.writeCString(name);
+    send.write(&stream_out_client->stream_out_info, sizeof(stream_out_client->stream_out_info));
     send.write(&bytes, sizeof(bytes));
 
     int transactRet = mAudioServiceBinder->transact(CMD_AS_SO_W, send, &reply);
@@ -522,28 +535,28 @@ ssize_t AudioClientBinder::StreamOut_write(struct audio_stream_out* stream, cons
 }
 
 int AudioClientBinder::StreamOut_get_render_position(const struct audio_stream_out* stream, uint32_t* dsp_frames) {
-    const char* name = (audio_stream_out_to_client(stream))->name;
-    return transactDataRetNumGetRef<const char*, int, uint32_t>(name, *dsp_frames, CMD_AS_SO_GRP, "data for stream out get render position");
+    void* stream_out_info = (audio_stream_out_to_client(stream))->stream_out_info;
+    return transactDataRetNumGetRef<void*, int, uint32_t>(stream_out_info, *dsp_frames, CMD_AS_SO_GRP, "data for stream out get render position");
 }
 
 int AudioClientBinder::StreamOut_get_next_write_timestamp(const struct audio_stream_out* stream, int64_t* timestamp) {
-    const char* name = (audio_stream_out_to_client(stream))->name;
-    return transactDataRetNumGetRef<const char*, int, int64_t>(name, *timestamp, CMD_AS_SO_GNWT, "data for stream out get next write timestamp");
+    void* stream_out_info = (audio_stream_out_to_client(stream))->stream_out_info;
+    return transactDataRetNumGetRef<void*, int, int64_t>(stream_out_info, *timestamp, CMD_AS_SO_GNWT, "data for stream out get next write timestamp");
 }
 
 int AudioClientBinder::StreamOut_pause(struct audio_stream_out* stream) {
-    char* name = (audio_stream_out_to_client(stream))->name;
-    return transactDataRetNum<char*, int>(name, CMD_AS_SO_P, "data for stream out pause");
+    void* stream_out_info = (audio_stream_out_to_client(stream))->stream_out_info;
+    return transactDataRetNum<void*, int>(stream_out_info, CMD_AS_SO_P, "data for stream out pause");
 }
 
 int AudioClientBinder::StreamOut_resume(struct audio_stream_out* stream) {
-    char* name = (audio_stream_out_to_client(stream))->name;
-    return transactDataRetNum<char*, int>(name, CMD_AS_SO_R, "data for stream out resume");
+    void* stream_out_info = (audio_stream_out_to_client(stream))->stream_out_info;
+    return transactDataRetNum<void*, int>(stream_out_info, CMD_AS_SO_R, "data for stream out resume");
 }
 
 int AudioClientBinder::StreamOut_flush(struct audio_stream_out* stream) {
-    const char* name = (audio_stream_out_to_client(stream))->name;
-    return transactDataRetNum<const char*, int>(name, CMD_AS_SO_F, "data for stream out flush");
+    void* stream_out_info = (audio_stream_out_to_client(stream))->stream_out_info;
+    return transactDataRetNum<void*, int>(stream_out_info, CMD_AS_SO_F, "data for stream out flush");
 }
 
 int AudioClientBinder::StreamOut_get_presentation_position(const struct audio_stream_out* stream, uint64_t* frames, struct timespec* timestamp) {
@@ -551,9 +564,8 @@ int AudioClientBinder::StreamOut_get_presentation_position(const struct audio_st
 
     ::android::Parcel send, reply;
 
-    const char* name = (audio_stream_out_to_client(stream))->name;
-
-    send.writeCString(name);
+    void* stream_out_info = (audio_stream_out_to_client(stream))->stream_out_info;
+    send.write(&stream_out_info, sizeof(stream_out_info));
 
     int transactRet = mAudioServiceBinder->transact(CMD_AS_SO_GPP, send, &reply);
     CHK_TRANSACT_RET_AND_RET(transactRet, "data for stream out get presentation position", transactRet);
@@ -572,9 +584,9 @@ int AudioClientBinder::StreamIn_set_gain(struct audio_stream_in* stream, float g
 
     ::android::Parcel send, reply;
 
-    const char* name = (audio_stream_in_to_client(stream))->name;
+    void* stream_in_info = (audio_stream_in_to_client(stream))->stream_in_info;
+    send.write(&stream_in_info, sizeof(stream_in_info));
 
-    send.writeCString(name);
     send.writeFloat(gain);
 
     int transactRet = mAudioServiceBinder->transact(CMD_AS_SI_SG, send, &reply);
@@ -588,8 +600,10 @@ ssize_t AudioClientBinder::StreamIn_read(struct audio_stream_in* stream, void* b
 
     ::android::Parcel send, reply;
 
-    char* name = (audio_stream_in_to_client(stream))->name;
-    send.writeCString(name);
+    struct audio_stream_in_client* stream_in_client = audio_stream_in_to_client(stream);
+
+    void* stream_in_info = stream_in_client->stream_in_info;
+    send.write(&stream_in_info, sizeof(stream_in_info));
 
     send.write(&bytes, sizeof(bytes));
 
@@ -598,17 +612,19 @@ ssize_t AudioClientBinder::StreamIn_read(struct audio_stream_in* stream, void* b
 
     ssize_t ret = reply.readInt32();
     if (ret > 0) {
-        void* streaminShm;
-        if (getStreamShm<std::map<const std::string, shm_map_t> >(INPUT_STREAM_LABEL, name, streamin_map_, streaminShm, ret) == -1) { return -1; }
-        memcpy(buffer, streaminShm, ret);
+        if (!stream_in_client->shm) {
+            std::cout << PROCESS_NAME_LOG << " Shared memory to " << INPUT_STREAM_LABEL << " " << stream_in_client->name << " was not previously allocated on client. Allocating." << std::endl;
+            setShmAndFdForStreamInClient(stream_in_client);
+        }
+        memcpy(buffer, stream_in_client->shm, ret);
     }
 
     return ret;
 }
 
 uint32_t AudioClientBinder::StreamIn_get_input_frames_lost(struct audio_stream_in* stream) {
-    const char* name = (audio_stream_in_to_client(stream))->name;
-    return transactDataRetNum<const char*, uint32_t>(name, CMD_AS_SI_GIFL, "data for stream in get input frames lost");
+    void* stream_in_info = (audio_stream_in_to_client(stream))->stream_in_info;
+    return transactDataRetNum<void*, uint32_t>(stream_in_info, CMD_AS_SI_GIFL, "data for stream in get input frames lost");
 }
 
 int AudioClientBinder::StreamIn_get_capture_position(const struct audio_stream_in* stream, int64_t* frames, int64_t* time) {
@@ -616,8 +632,8 @@ int AudioClientBinder::StreamIn_get_capture_position(const struct audio_stream_i
 
     ::android::Parcel send, reply;
 
-    const char* name = (audio_stream_in_to_client(stream))->name;
-    send.writeCString(name);
+    void* stream_in_info = (audio_stream_in_to_client(stream))->stream_in_info;
+    send.write(&stream_in_info, sizeof(stream_in_info));
 
     int transactRet = mAudioServiceBinder->transact(CMD_AS_SI_GCP, send, &reply);
     CHK_TRANSACT_RET_AND_RET(transactRet, "data for stream in get capture position", transactRet);
@@ -863,21 +879,78 @@ void AudioClientBinder::update_stream_name(char *name, size_t size, int id) {
     }
 }
 
-template <typename stream_map_t> int AudioClientBinder::getStreamShm(const char* streamLabel, const char* name, stream_map_t& streamMap, void*& shm, size_t length) {
-    std::string nameStr(name);
+void AudioClientBinder::cleanStreamoutClients() {
+    for (std::unordered_map<std::string, audio_stream_out_client_t*>::iterator it = streamoutClients.begin(); it != streamoutClients.end(); ++it) {
 
-    typename stream_map_t::iterator it = streamMap.find(nameStr);
-    if (it == streamMap.end()) { return -1; }
+        const char* name = it->first.c_str();
+        std::cout << PROCESS_NAME_LOG << " " OUTPUT_STREAM_LABEL << " " << name << " was opened." << std::endl;
 
-    shm = it->second.second;
-    if (!shm) {
-        std::cout << PROCESS_NAME_LOG << " Shared memory to " << streamLabel << " " << nameStr << " was not previously allocated on client. Allocating." << std::endl;
-
-        int fd = posixOpenFileAndMapData(PROCESS_NAME_LOG, streamLabel, name, O_RDWR, S_IRUSR | S_IWUSR, shm, length, PROT_READ | PROT_WRITE, MAP_SHARED);
-        if (fd == -1) { return -1; }
-
-        it->second.second = shm;
+        audio_stream_out_client_t* stream_out_client = it->second;
+        if (stream_out_client != nullptr) {
+            posixCloseFile(PROCESS_NAME_LOG, OUTPUT_STREAM_LABEL, name, stream_out_client->fd);
+            delete stream_out_client;
+            stream_out_client = nullptr;
+        }
     }
 
+    streamoutClients.clear();
+}
+
+void AudioClientBinder::cleanStreaminClients() {
+    for (std::unordered_map<std::string, audio_stream_in_client_t*>::iterator it = streaminClients.begin(); it != streaminClients.end(); ++it) {
+
+        const char* name = it->first.c_str();
+        std::cout << PROCESS_NAME_LOG << " " INPUT_STREAM_LABEL << " " << name << " was opened." << std::endl;
+
+        audio_stream_in_client_t* stream_in_client = it->second;
+        if (stream_in_client != nullptr) {
+            posixCloseFile(PROCESS_NAME_LOG, INPUT_STREAM_LABEL, name, stream_in_client->fd);
+            delete stream_in_client;
+            stream_in_client = nullptr;
+        }
+    }
+
+    streaminClients.clear();
+}
+
+int AudioClientBinder::updateStreamOutClient(const ::android::Parcel& reply, audio_stream_out_client_t* stream_out_client) {
+    int clientId = reply.readInt32();
+    update_stream_name(stream_out_client->name, sizeof(stream_out_client->name), clientId);
+
+    reply.read(&(stream_out_client->stream_hw), sizeof(stream_out_client->stream_hw));
+    reply.read(&(stream_out_client->stream_out_info), sizeof(stream_out_client->stream_out_info));
+
+    return setShmAndFdForStreamOutClient(stream_out_client);
+}
+
+int AudioClientBinder::updateStreamInClient(const ::android::Parcel& reply, audio_stream_in_client_t* stream_in_client) {
+    int clientId = reply.readInt32();
+    update_stream_name(stream_in_client->name, sizeof(stream_in_client->name), clientId);
+
+    reply.read(&(stream_in_client->stream_hw), sizeof(stream_in_client->stream_hw));
+    reply.read(&(stream_in_client->stream_in_info), sizeof(stream_in_client->stream_in_info));
+
+    return setShmAndFdForStreamInClient(stream_in_client);
+}
+
+int AudioClientBinder::setShmAndFdForStreamOutClient(audio_stream_out_client_t* stream_out_client) {
+    int fd; void* streamoutShm;
+    fd = posixOpenFileAndMapData(PROCESS_NAME_LOG, OUTPUT_STREAM_LABEL, stream_out_client->name, O_RDWR, S_IRUSR | S_IWUSR, streamoutShm, KSHAREDBUFFERSIZE, PROT_READ | PROT_WRITE, MAP_SHARED);
+    if (fd == -1) {
+        return -1;
+    }
+    stream_out_client->fd = fd;
+    stream_out_client->shm = streamoutShm;
+    return 0;
+}
+
+int AudioClientBinder::setShmAndFdForStreamInClient(audio_stream_in_client_t* stream_in_client) {
+    int fd; void* streaminShm;
+    fd = posixOpenFileAndMapData(PROCESS_NAME_LOG, INPUT_STREAM_LABEL, stream_in_client->name, O_RDWR, S_IRUSR | S_IWUSR, streaminShm, KSHAREDBUFFERSIZE, PROT_READ | PROT_WRITE, MAP_SHARED);
+    if (fd == -1) {
+        return -1;
+    }
+    stream_in_client->fd = fd;
+    stream_in_client->shm = streaminShm;
     return 0;
 }

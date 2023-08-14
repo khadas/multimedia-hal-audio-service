@@ -19,23 +19,33 @@
 #include <binder/Parcel.h>
 #include <binder/IServiceManager.h>
 
-#include "audio_effect_if.h"
+#include <memory>
 
+#include "audio_effect_if.h"
 #include "common.h"
 
 typedef struct audio_stream_client {
     char name[32];
+    void* stream_hw;
     struct audio_stream stream;
 } audio_stream_client_t;
 
 typedef struct audio_stream_out_client {
     char name[32];
+    void* stream_hw;
     struct audio_stream_out stream_out;
+    void* stream_out_info;
+    int fd;
+    void* shm;
 } audio_stream_out_client_t;
 
 typedef struct audio_stream_in_client {
     char name[32];
+    void* stream_hw;
     struct audio_stream_in stream_in;
+    void* stream_in_info;
+    int fd;
+    void* shm;
 } audio_stream_in_client_t;
 
 template< class T, class M >
@@ -63,8 +73,6 @@ inline audio_stream_client_t* audio_stream_to_client(const audio_stream* p)
     return container_of(p, &audio_stream_client::stream);
 }
 
-typedef std::pair<const int, void*> shm_map_t;
-
 class ClientDeathRecipient;
 
 class AudioClientBinder : public ::android::BBinder {
@@ -76,7 +84,7 @@ class AudioClientBinder : public ::android::BBinder {
 
         bool gotService();
 
-        void stop_execution();
+        void on_service_exception();    // service exception includes the case in which service turns off
 
         /* service methods */
         int Device_common_close();
@@ -99,13 +107,13 @@ class AudioClientBinder : public ::android::BBinder {
                                     audio_devices_t devices,
                                     audio_output_flags_t flags,
                                     struct audio_config* config,
-                                    audio_stream_out_client_t* stream_out,
+                                    audio_stream_out_client_t*& stream_out_client,
                                     const char* address);
         void Device_close_output_stream(struct audio_stream_out* stream_out);
         int Device_open_input_stream(audio_io_handle_t handle,
                                     audio_devices_t devices,
                                     struct audio_config* config,
-                                    struct audio_stream_in_client* stream_in,
+                                    audio_stream_in_client_t*& stream_in_client,
                                     audio_input_flags_t flags,
                                     const char *address,
                                     audio_source_t source);
@@ -170,7 +178,7 @@ class AudioClientBinder : public ::android::BBinder {
         ::android::sp<AudioClientBinder> spInstance_;
         ::android::sp<::android::IBinder> mAudioServiceBinder;
 
-        static std::mutex stop_execution_mutex_;
+        static std::mutex on_service_exception_mutex_;
         ::android::sp<ClientDeathRecipient> clientDeathRecipient;
 
         int numTries = 0;
@@ -179,10 +187,11 @@ class AudioClientBinder : public ::android::BBinder {
 
         static std::atomic_int stream_seq_;
 
-        static std::mutex map_in_mutex_;
-        static std::mutex map_out_mutex_;
-        std::map<const std::string, shm_map_t> streamin_map_;
-        std::map<const std::string, shm_map_t> streamout_map_;
+        static std::mutex stream_out_clients_mutex_;
+        std::unordered_map<std::string, audio_stream_out_client_t*> streamoutClients;
+
+        static std::mutex stream_in_clients_mutex_;
+        std::unordered_map<std::string, audio_stream_in_client_t*> streaminClients;
 
         void writeAudioConfigToParcel(const struct audio_config* config, ::android::Parcel& parcel);
         void writeAudioPortConfigToParcel(const struct audio_port_config* config, ::android::Parcel& parcel);
@@ -203,7 +212,12 @@ class AudioClientBinder : public ::android::BBinder {
         int new_stream_name(char* name, size_t size);
         void update_stream_name(char* name, size_t size, int id);
 
-        template <typename stream_map_t> int getStreamShm(const char* streamLabel, const char* name, stream_map_t& streamMap, void*& shm, size_t length);
+        void cleanStreamoutClients();
+        void cleanStreaminClients();
+        int updateStreamOutClient(const ::android::Parcel& reply, audio_stream_out_client_t* stream_out_client);
+        int updateStreamInClient(const ::android::Parcel& reply, audio_stream_in_client_t* stream_in_client);
+        int setShmAndFdForStreamOutClient(audio_stream_out_client_t* stream_out_client);
+        int setShmAndFdForStreamInClient(audio_stream_in_client_t* stream_in_client);
 
         virtual ::android::status_t onTransact(uint32_t code, const ::android::Parcel& data, ::android::Parcel* reply, uint32_t flags = 0) { return (0); }
 };

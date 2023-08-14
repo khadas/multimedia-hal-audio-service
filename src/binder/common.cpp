@@ -33,7 +33,9 @@ int posixMapData(const std::string& processNameLog, const char* identifierLabel,
 
 int posixOpenFileAndSetDataSize(const std::string& processNameLog, const char* identifierLabel, const char* identifier, int oflag, unsigned int mode, off_t length) {
     int fd = posixOpenFile(processNameLog, identifierLabel, identifier, oflag, mode);
-    if (fd == -1) { return -1; }
+    if (fd == -1) {
+        return -1;
+    }
     if (ftruncate(fd, length) == -1) {
         perror(std::string(processNameLog + " " + DEBUG_INFO + ", could not configure " + identifierLabel + " " + identifier + " data size").c_str());
         return -1;
@@ -44,20 +46,30 @@ int posixOpenFileAndSetDataSize(const std::string& processNameLog, const char* i
 int posixOpenFileSetDataSizeAndMapData(const std::string& processNameLog, const char* identifierLabel, const char* identifier, int oflag, unsigned int mode, off_t length,
                                     void*& data, int prot, int flags) {
     int fd = posixOpenFile(processNameLog, identifierLabel, identifier, oflag, mode);
-    if (fd == -1) { return -1; }
+    if (fd == -1) {
+        return -1;
+    }
     if (ftruncate(fd, length) == -1) {
         perror(std::string(processNameLog + " " + DEBUG_INFO + ", could not configure " + identifierLabel + " " + identifier + " data size").c_str());
         return -1;
     }
-    if (posixMapData(processNameLog, identifierLabel, identifier, data, length, prot, flags, fd) == -1) { return -1; }
+    if (posixMapData(processNameLog, identifierLabel, identifier, data, length, prot, flags, fd) == -1) {
+        posixCloseFile(processNameLog, identifierLabel, identifier, fd);
+        return -1;
+    }
     return fd;
 }
 
 int posixOpenFileAndMapData(const std::string& processNameLog, const char* identifierLabel, const char* identifier, int oflag, unsigned int mode,
                         void*& data, size_t length, int prot, int flags) {
     int fd = posixOpenFile(processNameLog, identifierLabel, identifier, oflag, mode);
-    if (fd == -1) { return -1; }
-    if (posixMapData(processNameLog, identifierLabel, identifier, data, length, prot, flags, fd) == -1) { return -1; }
+    if (fd == -1) {
+        return -1;
+    }
+    if (posixMapData(processNameLog, identifierLabel, identifier, data, length, prot, flags, fd) == -1) {
+        posixCloseFile(processNameLog, identifierLabel, identifier, fd);
+        return -1;
+    }
     return fd;
 }
 

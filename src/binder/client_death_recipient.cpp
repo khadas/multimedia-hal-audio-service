@@ -18,5 +18,5 @@
 void ClientDeathRecipient::binderDied(const ::android::wp<::android::IBinder>& who) {
     const std::string prefix = processNameLogs.AUDIO_CLIENT_BINDER;
     std::cout << prefix << " Service is dead." << std::endl;
-    respondingProcess_->stop_execution();
+    respondingProcess_->on_service_exception();
 }

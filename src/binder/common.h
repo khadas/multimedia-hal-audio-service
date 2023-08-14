@@ -23,7 +23,8 @@
 #include <chrono>
 #include <mutex>
 #include <condition_variable>
-#include <map>
+#include <unordered_set>
+#include <unordered_map>
 
 #include <sys/mman.h>
 #include <sys/stat.h>
@@ -64,9 +65,9 @@ struct {
 #define PARENT_DIRECTORY ".."
 
 typedef enum {
-    STREAM_OUT,
-    STREAM_IN,
-} stream_t;
+    AUDIO_STREAM_OUT,
+    AUDIO_STREAM_IN,
+} audio_stream_direction;
 
 struct {
     const std::string AUDIO_CLIENT_BINDER_TEST = "[AudioClientBinderTest]",
