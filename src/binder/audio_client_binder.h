@@ -35,6 +35,7 @@ typedef struct audio_stream_out_client {
     void* stream_hw;
     struct audio_stream_out stream_out;
     void* stream_out_info;
+    std::mutex stream_mutex;
     int fd;
     void* shm;
 } audio_stream_out_client_t;
@@ -44,6 +45,7 @@ typedef struct audio_stream_in_client {
     void* stream_hw;
     struct audio_stream_in stream_in;
     void* stream_in_info;
+    std::mutex stream_mutex;
     int fd;
     void* shm;
 } audio_stream_in_client_t;

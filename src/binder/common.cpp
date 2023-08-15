@@ -81,20 +81,24 @@ int posixCloseFile(const std::string& processNameLog, const char* identifierLabe
     return 0;
 }
 
-int posixUnmapDataAndCloseFile(const std::string& processNameLog, const char* identifierLabel, const char* identifier, void* data, size_t length, int fd) {
-    if (munmap(data, length) == -1) {
-        perror(std::string(processNameLog + " " + DEBUG_INFO + ", could not unmap from " + identifierLabel + " " + identifier + " data").c_str());
+int posixUnmapDataCloseFileAndUnlinkName(const std::string& processNameLog, const char* identifierLabel, const char* identifier, void*& data, size_t length, int fd) {
+    if (data == nullptr) {
+        std::cout << processNameLog << " " << DEBUG_INFO << ", unmap completed or " << identifierLabel << " " << identifier << " data pointer set to null elsewhere." << std::endl;
+    } else {
+        if (munmap(data, length) == -1) {
+            perror(std::string(processNameLog + " " + DEBUG_INFO + ", could not unmap from " + identifierLabel + " " + identifier + " data").c_str());
+            return -1;
+        }
+    }
+    data = nullptr;
+    if (posixCloseFile(processNameLog, identifierLabel, identifier, fd) == -1) {
         return -1;
     }
-    return posixCloseFile(processNameLog, identifierLabel, identifier, fd);
-}
-
-int posixUnlinkNameAndCloseFile(const std::string& processNameLog, const char* identifierLabel, const char* identifier, int fd) {
     if (shm_unlink(identifier) == -1) {
         perror(std::string(processNameLog + " " + DEBUG_INFO + ", could not unlink name from " + identifierLabel + " " + identifier + " data").c_str());
         return -1;
     }
-    return posixCloseFile(processNameLog, identifierLabel, identifier, fd);
+    return 0;
 }
 
 void SetAudioPermissions(const std::string& processNameLog, const char* file_path) {

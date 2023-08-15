@@ -144,12 +144,14 @@ int AudioServiceBinder::Device_open_output_stream(::android::sp<::android::IBind
                                             struct audio_config& config,
                                             const char* address,
                                             int& clientId,
-                                            audio_stream*& stream_hw,
+                                            struct audio_stream*& stream_hw,
                                             audio_stream_out_info_t*& stream_out_info) {
     CHKP_AND_RET(dev_, -1);
 
     stream_out_info = new audio_stream_out_info_t;
     if (!stream_out_info) return -ENOMEM;
+
+    stream_out_info->shm = nullptr;
 
     int client_id = ::android::IPCThreadState::self()->getCallingPid();
     if (client_id < 0) {
@@ -184,11 +186,15 @@ void AudioServiceBinder::Device_close_output_stream(audio_stream_out_info_t* str
     const char* name = stream_out_info->name;
     const std::string nameStr(name);
 
-    posixUnlinkNameAndCloseFile(PROCESS_NAME_LOG, OUTPUT_STREAM_LABEL, name, stream_out_info->fd);
+    {
+        std::lock_guard<std::mutex> lock(stream_out_info->stream_mutex);
+        posixUnmapDataCloseFileAndUnlinkName(PROCESS_NAME_LOG, OUTPUT_STREAM_LABEL, name, stream_out_info->shm, KSHAREDBUFFERSIZE, stream_out_info->fd);
+    }
 
-    if (dev_) {
+    struct audio_stream_out* stream_out_hw = stream_out_info->stream_out_hw;
+    if (dev_ && stream_out_hw) {
         std::cout << PROCESS_NAME_LOG << " close " << OUTPUT_STREAM_LABEL << " " << name << std::endl;
-        dev_->close_output_stream(dev_, stream_out_info->stream_out_hw);
+        dev_->close_output_stream(dev_, stream_out_hw);
     }
 
     int client_id = ::android::IPCThreadState::self()->getCallingPid();
@@ -214,6 +220,8 @@ int AudioServiceBinder::Device_open_input_stream(::android::sp<::android::IBinde
 
     stream_in_info = new audio_stream_in_info_t;
     if (!stream_in_info) return -ENOMEM;
+
+    stream_in_info->shm = nullptr;
 
     int client_id = ::android::IPCThreadState::self()->getCallingPid();
     if (client_id < 0) {
@@ -247,11 +255,15 @@ void AudioServiceBinder::Device_close_input_stream(audio_stream_in_info_t* strea
     const char* name = stream_in_info->name;
     const std::string nameStr(name);
 
-    posixUnlinkNameAndCloseFile(PROCESS_NAME_LOG, INPUT_STREAM_LABEL, name, stream_in_info->fd);
+    {
+        std::lock_guard<std::mutex> lock(stream_in_info->stream_mutex);
+        posixUnmapDataCloseFileAndUnlinkName(PROCESS_NAME_LOG, INPUT_STREAM_LABEL, name, stream_in_info->shm, KSHAREDBUFFERSIZE, stream_in_info->fd);
+    }
 
-    if (dev_) {
+    struct audio_stream_in* stream_in_hw = stream_in_info->stream_in_hw;
+    if (dev_ && stream_in_hw) {
         std::cout << PROCESS_NAME_LOG << " close " << INPUT_STREAM_LABEL << " " << name << std::endl;
-        dev_->close_input_stream(dev_, stream_in_info->stream_in_hw);
+        dev_->close_input_stream(dev_, stream_in_hw);
     }
 
     int client_id = ::android::IPCThreadState::self()->getCallingPid();
@@ -335,7 +347,7 @@ uint32_t AudioServiceBinder::Stream_get_channels(struct audio_stream* stream_hw)
     return (uint32_t) stream_hw->get_channels(stream_hw);
 }
 
-int AudioServiceBinder::Stream_get_format(struct audio_stream* stream_hw) {
+uint32_t AudioServiceBinder::Stream_get_format(struct audio_stream* stream_hw) {;
     return (uint32_t) stream_hw->get_format(stream_hw);
 }
 
@@ -377,22 +389,35 @@ int AudioServiceBinder::StreamOut_set_volume(struct audio_stream_out* stream_out
 
 ssize_t AudioServiceBinder::StreamOut_write(audio_stream_out_info_t* stream_out_info, size_t bytes) {
     CHKP_AND_RET(dev_, -1);
+    CHKP_AND_RET(stream_out_info, -1);
 
-    if (stream_out_info->shm == nullptr) {
-        const char* name = stream_out_info->name;
-        std::cout << PROCESS_NAME_LOG << " Shared memory to " << OUTPUT_STREAM_LABEL << " " << name << " was not previously allocated on service. Allocating." << std::endl;
-        if (setShmAndFdForStreamOutInfo(name, stream_out_info) == -1) return -1;
+    {
+        std::lock_guard<std::mutex> lock(stream_out_info->stream_mutex);
+
+        if (stream_out_info->shm == nullptr) {
+            const char* name = stream_out_info->name;
+            std::cout << PROCESS_NAME_LOG << " Shared memory to " << OUTPUT_STREAM_LABEL << " " << name << " was not previously allocated on service. Allocating." << std::endl;
+            if (setShmAndFdForStreamOutInfo(name, stream_out_info) == -1) {
+                return -1;
+            }
+        }
     }
 
     struct audio_stream_out* stream_out_hw = stream_out_info->stream_out_hw;
     CHKP_AND_RET(stream_out_hw, -1);
 
-    return stream_out_hw->write(stream_out_hw, stream_out_info->shm, bytes);
+    {
+        std::lock_guard<std::mutex> lock(stream_out_info->stream_mutex);
+        CHKP_AND_RET(stream_out_info->shm, -1);
+        return stream_out_hw->write(stream_out_hw, stream_out_info->shm, bytes);
+    }
 }
 
 int AudioServiceBinder::StreamOut_get_render_position(struct audio_stream_out* stream_out_hw, uint32_t& dsp_frames) {
     CHKP_AND_RET(dev_, -1);
     CHKP_AND_RET(stream_out_hw, -1);
+
+    dsp_frames = 0;
     return stream_out_hw->get_render_position(stream_out_hw, &dsp_frames);
 }
 
@@ -440,17 +465,28 @@ int AudioServiceBinder::StreamIn_set_gain(struct audio_stream_in* stream_in_hw, 
 
 int AudioServiceBinder::StreamIn_read(audio_stream_in_info_t* stream_in_info, size_t bytes) {
     CHKP_AND_RET(dev_, -1);
+    CHKP_AND_RET(stream_in_info, -1);
 
-    if (stream_in_info->shm == nullptr) {
-        const char* name = stream_in_info->name;
-        std::cout << PROCESS_NAME_LOG << " Shared memory to " << INPUT_STREAM_LABEL << " " << name << " was not previously allocated on service. Allocating." << std::endl;
-        if (setShmAndFdForStreamInInfo(name, stream_in_info) == -1) return -1;
+    {
+        std::lock_guard<std::mutex> lock(stream_in_info->stream_mutex);
+
+        if (stream_in_info->shm == nullptr) {
+            const char* name = stream_in_info->name;
+            std::cout << PROCESS_NAME_LOG << " Shared memory to " << INPUT_STREAM_LABEL << " " << name << " was not previously allocated on service. Allocating." << std::endl;
+            if (setShmAndFdForStreamInInfo(name, stream_in_info) == -1) {
+                return -1;
+            }
+        }
     }
 
     struct audio_stream_in* stream_in_hw = stream_in_info->stream_in_hw;
     CHKP_AND_RET(stream_in_hw, -1);
 
-    return stream_in_hw->read(stream_in_hw, stream_in_info->shm, std::min(bytes, (size_t) KSHAREDBUFFERSIZE));
+    {
+        std::lock_guard<std::mutex> lock(stream_in_info->stream_mutex);
+        CHKP_AND_RET(stream_in_info->shm, -1);
+        return stream_in_hw->read(stream_in_hw, stream_in_info->shm, std::min(bytes, (size_t) KSHAREDBUFFERSIZE));
+    }
 }
 
 uint32_t AudioServiceBinder::StreamIn_get_input_frames_lost(struct audio_stream_in* stream_in_hw) {
@@ -461,7 +497,6 @@ uint32_t AudioServiceBinder::StreamIn_get_input_frames_lost(struct audio_stream_
 
 int AudioServiceBinder::StreamIn_get_capture_position(struct audio_stream_in* stream_in_hw, int64_t& frames, int64_t& time) {
     CHKP_AND_RET(dev_, -1);
-
     CHKP_AND_RET(stream_in_hw, -1);
 
     frames = time = 0;
@@ -506,14 +541,14 @@ void AudioServiceBinder::stream_gc_(const std::unordered_map<std::string, stream
         if (streamDirection == AUDIO_STREAM_OUT) {
             audio_stream_out_info_t* stream_out_info = static_cast<audio_stream_out_info_t*>(streamInfo);
             if (stream_out_info != nullptr) {
-                streamout_gc_(streamNameCStr, stream_out_info->fd, stream_out_info->stream_out_hw);
+                streamout_gc_(stream_out_info->stream_mutex, streamNameCStr, stream_out_info->shm, stream_out_info->fd, stream_out_info->stream_out_hw);
                 delete stream_out_info;
                 stream_out_info = nullptr;
             }
         } else {
             audio_stream_in_info_t* stream_in_info = static_cast<audio_stream_in_info_t*>(streamInfo);
             if (stream_in_info != nullptr) {
-                streamin_gc_(streamNameCStr, stream_in_info->fd, stream_in_info->stream_in_hw);
+                streamin_gc_(stream_in_info->stream_mutex, streamNameCStr, stream_in_info->shm, stream_in_info->fd, stream_in_info->stream_in_hw);
                 delete stream_in_info;
                 stream_in_info = nullptr;
             }
@@ -521,17 +556,25 @@ void AudioServiceBinder::stream_gc_(const std::unordered_map<std::string, stream
     }
 }
 
-void AudioServiceBinder::streamout_gc_(const char* name, int fd, audio_stream_out* stream_out_hw) {
-    posixUnlinkNameAndCloseFile(PROCESS_NAME_LOG, OUTPUT_STREAM_LABEL, name, fd);
-    if (dev_) {
+void AudioServiceBinder::streamout_gc_(std::mutex& stream_mutex, const char* name, void* shm, int fd, audio_stream_out* stream_out_hw) {
+    {
+        std::lock_guard<std::mutex> lock(stream_mutex);
+        posixUnmapDataCloseFileAndUnlinkName(PROCESS_NAME_LOG, OUTPUT_STREAM_LABEL, name, shm, KSHAREDBUFFERSIZE, fd);
+    }
+
+    if (dev_ && stream_out_hw) {
         std::cout << PROCESS_NAME_LOG << " close " << OUTPUT_STREAM_LABEL << " " << name << std::endl;
         dev_->close_output_stream(dev_, stream_out_hw);
     }
 }
 
-void AudioServiceBinder::streamin_gc_(const char* name, int fd, audio_stream_in* stream_in_hw) {
-    posixUnlinkNameAndCloseFile(PROCESS_NAME_LOG, INPUT_STREAM_LABEL, name, fd);
-    if (dev_) {
+void AudioServiceBinder::streamin_gc_(std::mutex& stream_mutex, const char* name, void* shm, int fd, audio_stream_in* stream_in_hw) {
+    {
+        std::lock_guard<std::mutex> lock(stream_mutex);
+        posixUnmapDataCloseFileAndUnlinkName(PROCESS_NAME_LOG, INPUT_STREAM_LABEL, name, shm, KSHAREDBUFFERSIZE, fd);
+    }
+
+    if (dev_ && stream_in_hw) {
         std::cout << PROCESS_NAME_LOG << " close " << INPUT_STREAM_LABEL << " " << name << std::endl;
         dev_->close_input_stream(dev_, stream_in_hw);
     }
@@ -540,13 +583,19 @@ void AudioServiceBinder::streamin_gc_(const char* name, int fd, audio_stream_in*
 int AudioServiceBinder::updateStreamOutInfo(const char* name, struct audio_stream_out* stream, audio_stream_out_info_t* stream_out_info) {
     strcpy(stream_out_info->name, name);
     stream_out_info->stream_out_hw = stream;
-    return setShmAndFdForStreamOutInfo(name, stream_out_info);
+    {
+        std::lock_guard<std::mutex> lock(stream_out_info->stream_mutex);
+        return setShmAndFdForStreamOutInfo(name, stream_out_info);
+    }
 }
 
 int AudioServiceBinder::updateStreamInInfo(const char* name, struct audio_stream_in* stream, audio_stream_in_info_t* stream_in_info) {
     strcpy(stream_in_info->name, name);
     stream_in_info->stream_in_hw = stream;
-    return setShmAndFdForStreamInInfo(name, stream_in_info);
+    {
+        std::lock_guard<std::mutex> lock(stream_in_info->stream_mutex);
+        return setShmAndFdForStreamInInfo(name, stream_in_info);
+    }
 }
 
 int AudioServiceBinder::setShmAndFdForStreamOutInfo(const char* name, audio_stream_out_info_t* stream_out_info) {
@@ -898,13 +947,13 @@ void AudioServiceBinder::readAudioPortConfigsFromParcel(unsigned int numConfigs,
             break;
         }
         case CMD_AS_SO_GL: {
-            struct audio_stream_out_info* stream_out_info; data.read(&stream_out_info, sizeof(stream_out_info));
+            audio_stream_out_info_t* stream_out_info; data.read(&stream_out_info, sizeof(stream_out_info));
             uint32_t ret = StreamOut_get_latency(stream_out_info->stream_out_hw);
             reply->writeUint32(ret);
             break;
         }
         case CMD_AS_SO_SV: {
-            struct audio_stream_out_info* stream_out_info; data.read(&stream_out_info, sizeof(stream_out_info));
+            audio_stream_out_info_t* stream_out_info; data.read(&stream_out_info, sizeof(stream_out_info));
             float left = data.readFloat();
             float right = data.readFloat();
             int ret = StreamOut_set_volume(stream_out_info->stream_out_hw, left, right);
@@ -912,14 +961,14 @@ void AudioServiceBinder::readAudioPortConfigsFromParcel(unsigned int numConfigs,
             break;
         }
         case CMD_AS_SO_W: {
-            struct audio_stream_out_info* stream_out_info; data.read(&stream_out_info, sizeof(stream_out_info));
+            audio_stream_out_info_t* stream_out_info; data.read(&stream_out_info, sizeof(stream_out_info));
             size_t bytes; data.read(&bytes, sizeof(bytes));
             int ret = StreamOut_write(stream_out_info, bytes);
             reply->writeInt32(ret);
             break;
         }
         case CMD_AS_SO_GRP: {
-            struct audio_stream_out_info* stream_out_info; data.read(&stream_out_info, sizeof(stream_out_info));
+            audio_stream_out_info_t* stream_out_info; data.read(&stream_out_info, sizeof(stream_out_info));
             uint32_t dsp_frames;
             int ret = StreamOut_get_render_position(stream_out_info->stream_out_hw, dsp_frames);
             reply->writeInt32(ret);
@@ -927,7 +976,7 @@ void AudioServiceBinder::readAudioPortConfigsFromParcel(unsigned int numConfigs,
             break;
         }
         case CMD_AS_SO_GNWT: {
-            struct audio_stream_out_info* stream_out_info; data.read(&stream_out_info, sizeof(stream_out_info));
+            audio_stream_out_info_t* stream_out_info; data.read(&stream_out_info, sizeof(stream_out_info));
             int64_t timestamp;
             int ret = StreamOut_get_next_write_timestamp(stream_out_info->stream_out_hw, timestamp);
             reply->writeInt32(ret);
@@ -935,25 +984,25 @@ void AudioServiceBinder::readAudioPortConfigsFromParcel(unsigned int numConfigs,
             break;
         }
         case CMD_AS_SO_P: {
-            struct audio_stream_out_info* stream_out_info; data.read(&stream_out_info, sizeof(stream_out_info));
+            audio_stream_out_info_t* stream_out_info; data.read(&stream_out_info, sizeof(stream_out_info));
             int ret = StreamOut_pause(stream_out_info->stream_out_hw);
             reply->writeInt32(ret);
             break;
         }
         case CMD_AS_SO_R: {
-            struct audio_stream_out_info* stream_out_info; data.read(&stream_out_info, sizeof(stream_out_info));
+            audio_stream_out_info_t* stream_out_info; data.read(&stream_out_info, sizeof(stream_out_info));
             int ret = StreamOut_resume(stream_out_info->stream_out_hw);
             reply->writeInt32(ret);
             break;
         }
         case CMD_AS_SO_F: {
-            struct audio_stream_out_info* stream_out_info; data.read(&stream_out_info, sizeof(stream_out_info));
+            audio_stream_out_info_t* stream_out_info; data.read(&stream_out_info, sizeof(stream_out_info));
             int ret = StreamOut_flush(stream_out_info->stream_out_hw);
             reply->writeInt32(ret);
             break;
         }
         case CMD_AS_SO_GPP: {
-            struct audio_stream_out_info* stream_out_info; data.read(&stream_out_info, sizeof(stream_out_info));
+            audio_stream_out_info_t* stream_out_info; data.read(&stream_out_info, sizeof(stream_out_info));
             uint64_t frames; struct timespec timestamp;
             int ret = StreamOut_get_presentation_position(stream_out_info->stream_out_hw, frames, timestamp);
             reply->writeInt32(ret);
@@ -963,21 +1012,21 @@ void AudioServiceBinder::readAudioPortConfigsFromParcel(unsigned int numConfigs,
             break;
         }
         case CMD_AS_SI_SG: {
-            struct audio_stream_in_info* stream_in_info; data.read(&stream_in_info, sizeof(stream_in_info));
+            audio_stream_in_info_t* stream_in_info; data.read(&stream_in_info, sizeof(stream_in_info));
             float gain = data.readFloat();
             int ret = StreamIn_set_gain(stream_in_info->stream_in_hw, gain);
             reply->writeInt32(ret);
             break;
         }
         case CMD_AS_SI_R: {
-            struct audio_stream_in_info* stream_in_info; data.read(&stream_in_info, sizeof(stream_in_info));
+            audio_stream_in_info_t* stream_in_info; data.read(&stream_in_info, sizeof(stream_in_info));
             size_t bytes; data.read(&bytes, sizeof(bytes));
             int ret = StreamIn_read(stream_in_info, bytes);
             reply->writeInt32(ret);
             break;
         }
         case CMD_AS_SI_GIFL: {
-            struct audio_stream_in_info* stream_in_info; data.read(&stream_in_info, sizeof(stream_in_info));
+            audio_stream_in_info_t* stream_in_info; data.read(&stream_in_info, sizeof(stream_in_info));
             uint32_t ret = StreamIn_get_input_frames_lost(stream_in_info->stream_in_hw);
             reply->writeUint32(ret);
             break;

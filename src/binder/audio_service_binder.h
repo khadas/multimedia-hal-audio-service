@@ -27,6 +27,7 @@
 typedef struct audio_stream_out_info {
     char name[32];
     struct audio_stream_out* stream_out_hw;
+    std::mutex stream_mutex;
     int fd;
     void* shm;
 } audio_stream_out_info_t;
@@ -34,6 +35,7 @@ typedef struct audio_stream_out_info {
 typedef struct audio_stream_in_info {
     char name[32];
     struct audio_stream_in* stream_in_hw;
+    std::mutex stream_mutex;
     int fd;
     void* shm;
 } audio_stream_in_info_t;
@@ -177,7 +179,7 @@ class AudioServiceBinder : public ::android::BBinder {
         uint32_t Stream_get_channels(struct audio_stream* stream_hw);
 
         // Return the audio format - e.g. AUDIO_FORMAT_PCM_16_BIT
-        int Stream_get_format(struct audio_stream* stream_hw);
+        uint32_t Stream_get_format(struct audio_stream* stream_hw);
 
         // Put the audio hardware input/output into standby mode.
         // Driver should exit from standby mode at the next I/O operation.
@@ -338,8 +340,8 @@ class AudioServiceBinder : public ::android::BBinder {
 
         // garbage collection
         void stream_gc_(const std::unordered_map<std::string, stream_data_t>& streamsInfo);
-        void streamout_gc_(const char* name, int fd, audio_stream_out* stream_out_hw);
-        void streamin_gc_(const char* name, int fd, audio_stream_in* stream_in_hw);
+        void streamout_gc_(std::mutex& stream_mutex, const char* name, void* shm, int fd, audio_stream_out* stream_out_hw);
+        void streamin_gc_(std::mutex& stream_mutex, const char* name, void* shm, int fd, audio_stream_in* stream_in_hw);
 
         /* helper methods */
         int updateStreamOutInfo(const char* name, struct audio_stream_out* stream, audio_stream_out_info_t* stream_out_info);

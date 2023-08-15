@@ -142,9 +142,7 @@ extern int posixOpenFileAndMapData(const std::string& processNameLog, const char
 
 extern int posixCloseFile(const std::string& processNameLog, const char* identifierLabel, const char* identifier, int fd);
 
-extern int posixUnmapDataAndCloseFile(const std::string& processNameLog, const char* identifierLabel, const char* identifier, void* data, size_t length, int fd);
-
-extern int posixUnlinkNameAndCloseFile(const std::string& processNameLog, const char* identifierLabel, const char* identifier, int fd);
+extern int posixUnmapDataCloseFileAndUnlinkName(const std::string& processNameLog, const char* identifierLabel, const char* identifier, void*& data, size_t length, int fd);
 
 extern void SetAudioPermissions(const std::string& processNameLog, const char* file_path);
 
