@@ -47,6 +47,7 @@
 #define AML_CHIP_ID_S1A 69
 #define HDMI_OUT_MUTE "Audio hdmi-out mute"
 #define DAC_DIGITAL_VOLUME "DAC Digital Playback Volume"
+#define DIGITAL_MODE "Audio Digital Mode"
 #define DAC_DIGITAl_DEFAULT_VOLUME          (251)
 #define HEADPHONE_DAC_CHANNEL_NUM    (2)
 
@@ -789,5 +790,34 @@ bool aml_audio_get_mute(int port)
     pthread_mutex_unlock(&g_mute_lock);
     return ret;
 }
+
+    int aml_audio_set_digital_mode(enum audio_digital_mode mode)
+    {
+        int ret = 0;
+        if ((mode != AML_HAL_PCM) && (mode != AML_HAL_DDP) &&
+            (mode != AML_HAL_AUTO) && (mode != AML_HAL_BYPASS) &&
+            (mode != AML_HAL_DD)) {
+            printf("Invalid mode\n");
+            return false;
+        }
+
+        pthread_mutex_lock(&g_volume_lock);
+        ret = aml_audio_mixer_int(DIGITAL_MODE, mode, true);
+        ALOGD("[%s:%d] mode: %d, ret: %d", __func__, __LINE__, mode, ret);
+        pthread_mutex_unlock(&g_volume_lock);
+
+        return ret;
+    }
+
+    int aml_audio_get_digital_mode()
+    {
+        pthread_mutex_lock(&g_volume_lock);
+        int ret = 0;
+        ret = aml_audio_mixer_int(DIGITAL_MODE, 0, false);
+        ALOGD("[%s:%d] mod: %d", __func__, __LINE__, ret);
+        pthread_mutex_unlock(&g_volume_lock);
+
+        return ret;
+    }
 
 }//extern c

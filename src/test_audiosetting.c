@@ -28,6 +28,8 @@ static void usage()
     printf("      get volume          : test_audiosetting volume\n");
     printf("      set mute            : test_audiosetting mute port x (port:hdmi or hp, x is mute:1 or unmute:0)\n");
     printf("      get mute            : test_audiosetting mute port (port:hdmi or hp)\n");
+    printf("      set mode            : test_audiosetting mode \"AML_HAL_xxx\"\n");
+    printf("      get mode            : test_audiosetting mode\n");
 }
 
 int main(int argc, char **argv)
@@ -56,6 +58,20 @@ int main(int argc, char **argv)
         else if (!strncmp("hp", argv[2], sizeof("hp")))
             ret = aml_audio_get_mute(AUDIO_PORT_HEADPHONE);
         printf("aml_audio_get_mute(%s): %smute\n", argv[2], ret ? "" : "un");
+    } else if (!strncmp("mode", argv[1], sizeof("mode")) && argv[2] != NULL) {
+        if (!strncmp("AML_HAL_PCM", argv[2], sizeof("AML_HAL_PCM")))
+            ret = aml_audio_set_digital_mode(AML_HAL_PCM);
+        else if (!strncmp("AML_HAL_DD", argv[2], sizeof("AML_HAL_DD")))
+            ret = aml_audio_set_digital_mode(AML_HAL_DD);
+        else if (!strncmp("AML_HAL_AUTO", argv[2], sizeof("AML_HAL_AUTO")))
+            ret = aml_audio_set_digital_mode(AML_HAL_AUTO);
+        else if (!strncmp("AML_HAL_BYPASS", argv[2], sizeof("AML_HAL_BYPASS")))
+            ret = aml_audio_set_digital_mode(AML_HAL_BYPASS);
+        else if (!strncmp("AML_HAL_DDP", argv[2], sizeof("AML_HAL_DDP")))
+            ret = aml_audio_set_digital_mode(AML_HAL_DDP);
+    } else if (!strncmp("mode", argv[1], sizeof("mode"))) {
+        ret = aml_audio_get_digital_mode();
+        printf("aml_audio_get_digital_mode: %d\n", ret);
     }
     return 0;
 }

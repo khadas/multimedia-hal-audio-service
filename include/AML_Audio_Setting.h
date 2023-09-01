@@ -32,6 +32,15 @@ enum AudioPort_t {
   AUDIO_PORT_MAX    = 2,
 };
 
+enum audio_digital_mode {
+  AML_HAL_PCM = 0,
+  AML_HAL_DD = 1,
+  AML_HAL_AUTO = 2,
+  AML_HAL_BYPASS = 3,
+  AML_HAL_DDP = 4,
+};
+
+
 /*
 *@brief     set volume via kcontrol
 *@param     Set volume value,The range of the value is [0,100],value is a int type
@@ -58,6 +67,19 @@ int aml_audio_set_mute(int port, bool mute);
 *@return    Return mute value (bool type), ture is mute and false is unmute
 */
 bool aml_audio_get_mute(int port);
+
+/*
+*@brief     set digital mode via kcontrol
+*@param     mode: audio digital enumeration type
+*@return    Return int type value,0 is setting successful, and <0 is setiing failed
+*/
+int aml_audio_set_digital_mode(enum audio_digital_mode mode);
+
+/*
+*@brief     get digital mode via kcontrol
+*@return    Return audio digital mode
+*/
+int aml_audio_get_digital_mode();
 
 #ifdef __cplusplus
 }
