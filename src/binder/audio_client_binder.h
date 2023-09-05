@@ -159,7 +159,7 @@ class AudioClientBinder : public ::android::BBinder {
         ////////////////////////////
 
         int StreamIn_set_gain(struct audio_stream_in* stream, float gain);
-        int StreamIn_read(struct audio_stream_in* stream, void* buffer, size_t bytes);
+        ssize_t StreamIn_read(struct audio_stream_in* stream, void* buffer, size_t bytes);
         uint32_t StreamIn_get_input_frames_lost(struct audio_stream_in* stream);
         int StreamIn_get_capture_position(const struct audio_stream_in* stream, int64_t* frames, int64_t* time);
 
