@@ -58,7 +58,7 @@ endif
 CXXFLAGS += -Wall -std=c++14
 
 ifeq ($(use_binder),y)
-SC_LDFLAGS+=-Wl,--no-as-needed -lbinder -lamaudioutils -llog -ldl -lrt -lpthread -lstdc++ -pthread
+SC_LDFLAGS+=-Wl,--no-as-needed -lbinder -lboost_system -lamaudioutils -llog -ldl -lrt -lpthread -lstdc++ -pthread
 LDFLAGS+= -Wl,--no-as-needed -lbinder -llog -ldl -lrt -lpthread -lstdc++ -pthread
 else
 SC_LDFLAGS+=-Wl,--no-as-needed -lgrpc++_unsecure -lprotobuf -lboost_system -lamaudioutils -llog -ldl -lrt -lpthread -lstdc++ -pthread

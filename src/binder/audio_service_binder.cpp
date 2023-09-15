@@ -17,6 +17,10 @@
 #include "audio_service_binder.h"
 #include "service_death_recipient.h"
 
+#include <IpcBuffer/audio_server_shmem.h>
+#include <IpcBuffer/IpcBuffer.h>
+#include <boost/interprocess/managed_shared_memory.hpp>
+
 #define CHKP_AND_RET(p, r) do { if (!(p)) return (r); } while (0)
 
 std::mutex AudioServiceBinder::gc_map_mutex_;
@@ -24,6 +28,7 @@ std::mutex AudioServiceBinder::gc_map_mutex_;
 AudioServiceBinder* AudioServiceBinder::mInstance = nullptr;
 
 AudioServiceBinder* AudioServiceBinder::GetInstance() {
+    audio_server_shmem::getInstance(true);
     if (mInstance == nullptr) {
         mInstance = new AudioServiceBinder();
     }
