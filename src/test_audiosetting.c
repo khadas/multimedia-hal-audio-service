@@ -30,6 +30,8 @@ static void usage()
     printf("      get mute            : test_audiosetting mute port (port:hdmi or hp)\n");
     printf("      set mode            : test_audiosetting mode \"AML_HAL_xxx\"\n");
     printf("      get mode            : test_audiosetting mode\n");
+    printf("      set drc             : test_audiosetting drc \"RF/LINE/OFF\"\n");
+    printf("      get drc             : test_audiosetting drc\n");
 }
 
 int main(int argc, char **argv)
@@ -72,6 +74,16 @@ int main(int argc, char **argv)
     } else if (!strncmp("mode", argv[1], sizeof("mode"))) {
         ret = aml_audio_get_digital_mode();
         printf("aml_audio_get_digital_mode: %d\n", ret);
+    } else if (!strncmp("drc", argv[1], sizeof("drc")) && argv[2] != NULL) {
+        if (!strncmp("RF", argv[2], sizeof("RF")))
+            ret = aml_audio_set_drc_mode(DRC_RF);
+        else if (!strncmp("LINE", argv[2], sizeof("LINE")))
+            ret = aml_audio_set_drc_mode(DRC_LINE);
+        else if (!strncmp("OFF", argv[2], sizeof("OFF")))
+            ret = aml_audio_set_drc_mode(DRC_OFF);
+    } else if (!strncmp("drc", argv[1], sizeof("drc"))) {
+        ret = aml_audio_get_drc_mode();
+        printf("aml_audio_get_drc_mode: %d\n", ret);
     }
     return 0;
 }

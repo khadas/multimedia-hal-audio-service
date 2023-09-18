@@ -48,8 +48,15 @@
 #define HDMI_OUT_MUTE "Audio hdmi-out mute"
 #define DAC_DIGITAL_VOLUME "DAC Digital Playback Volume"
 #define DIGITAL_MODE "Audio Digital Mode"
+#define DRC_CONTROL "Audio DRC Control"
 #define DAC_DIGITAl_DEFAULT_VOLUME          (251)
 #define HEADPHONE_DAC_CHANNEL_NUM    (2)
+
+#define DRC_MODE_LINE 2
+#define DRC_MODE_RF 3
+#define DRC_MODE_BIT  0
+#define DRC_HIGH_CUT_BIT 3
+#define DRC_LOW_BST_BIT 16
 
 extern "C" {
 
@@ -791,33 +798,70 @@ bool aml_audio_get_mute(int port)
     return ret;
 }
 
-    int aml_audio_set_digital_mode(enum audio_digital_mode mode)
-    {
-        int ret = 0;
-        if ((mode != AML_HAL_PCM) && (mode != AML_HAL_DDP) &&
-            (mode != AML_HAL_AUTO) && (mode != AML_HAL_BYPASS) &&
-            (mode != AML_HAL_DD)) {
-            printf("Invalid mode\n");
-            return false;
-        }
-
-        pthread_mutex_lock(&g_volume_lock);
-        ret = aml_audio_mixer_int(DIGITAL_MODE, mode, true);
-        ALOGD("[%s:%d] mode: %d, ret: %d", __func__, __LINE__, mode, ret);
-        pthread_mutex_unlock(&g_volume_lock);
-
-        return ret;
+int aml_audio_set_digital_mode(enum audio_digital_mode mode)
+{
+    int ret = 0;
+    if ((mode != AML_HAL_PCM) && (mode != AML_HAL_DDP) &&
+        (mode != AML_HAL_AUTO) && (mode != AML_HAL_BYPASS) &&
+        (mode != AML_HAL_DD)) {
+        printf("Invalid mode\n");
+        return false;
     }
 
-    int aml_audio_get_digital_mode()
-    {
-        pthread_mutex_lock(&g_volume_lock);
-        int ret = 0;
-        ret = aml_audio_mixer_int(DIGITAL_MODE, 0, false);
-        ALOGD("[%s:%d] mod: %d", __func__, __LINE__, ret);
-        pthread_mutex_unlock(&g_volume_lock);
+    pthread_mutex_lock(&g_volume_lock);
+    ret = aml_audio_mixer_int(DIGITAL_MODE, mode, true);
+    ALOGD("[%s:%d] mode: %d, ret: %d", __func__, __LINE__, mode, ret);
+    pthread_mutex_unlock(&g_volume_lock);
 
-        return ret;
+    return ret;
+}
+
+int aml_audio_get_digital_mode()
+{
+    pthread_mutex_lock(&g_volume_lock);
+    int ret = 0;
+    ret = aml_audio_mixer_int(DIGITAL_MODE, 0, false);
+    ALOGD("[%s:%d] mod: %d", __func__, __LINE__, ret);
+    pthread_mutex_unlock(&g_volume_lock);
+
+    return ret;
+}
+
+int aml_audio_set_drc_mode(enum audio_drc_mode mode)
+{
+    int ret = 0;
+    int drc_control = DRC_MODE_LINE;
+    if ((mode != DRC_RF) && (mode != DRC_LINE) && (mode != DRC_OFF)) {
+        printf("Invalid mode!\n");
+        return false;
     }
 
+    pthread_mutex_lock(&g_volume_lock);
+    if (mode == DRC_LINE) {
+        drc_control = (DRC_MODE_LINE<<DRC_MODE_BIT)|(100<<DRC_HIGH_CUT_BIT)|(100<<DRC_LOW_BST_BIT);
+    } else if (mode == DRC_RF) {
+        drc_control = (DRC_MODE_RF<<DRC_MODE_BIT)|(100<<DRC_HIGH_CUT_BIT)|(100<<DRC_LOW_BST_BIT);
+    }
+    ret = aml_audio_mixer_int(DRC_CONTROL, drc_control, true);
+    ALOGD("[%s:%d] mode: %d, drc_control: %#x, ret: %d.", __func__, __LINE__, mode, drc_control, ret);
+    pthread_mutex_unlock(&g_volume_lock);
+
+    return ret;
+}
+
+int aml_audio_get_drc_mode()
+{
+    pthread_mutex_lock(&g_volume_lock);
+    int ret = 0, drc_control;
+    drc_control = aml_audio_mixer_int(DRC_CONTROL, 0, false);
+
+    if (drc_control == DRC_MODE_LINE)
+        ret = DRC_OFF;
+    else
+        ret = (drc_control&3 == DRC_MODE_LINE) ? DRC_LINE : DRC_RF;
+    ALOGD("[%s:%d] mode: %d", __func__, __LINE__, ret);
+    pthread_mutex_unlock(&g_volume_lock);
+
+    return ret;
+}
 }//extern c

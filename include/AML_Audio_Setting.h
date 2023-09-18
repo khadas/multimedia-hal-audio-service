@@ -40,6 +40,12 @@ enum audio_digital_mode {
   AML_HAL_DDP = 4,
 };
 
+enum audio_drc_mode {
+  DRC_RF = 0,
+  DRC_LINE = 1,
+  DRC_OFF = 2,
+};
+
 
 /*
 *@brief     set volume via kcontrol
@@ -71,7 +77,7 @@ bool aml_audio_get_mute(int port);
 /*
 *@brief     set digital mode via kcontrol
 *@param     mode: audio digital enumeration type
-*@return    Return int type value,0 is setting successful, and <0 is setiing failed
+*@return    Return int type value,0 is setting successful, and <0 is setting failed
 */
 int aml_audio_set_digital_mode(enum audio_digital_mode mode);
 
@@ -80,6 +86,20 @@ int aml_audio_set_digital_mode(enum audio_digital_mode mode);
 *@return    Return audio digital mode
 */
 int aml_audio_get_digital_mode();
+
+/*
+*@brief     set drc mode via kcontrol
+*@param     mode: audio drc enumeration type
+*@return    Return int type value,0 is setting successful, and <0 is setting failed
+*/
+int aml_audio_set_drc_mode(enum audio_drc_mode mode);
+
+/*
+*@brief     get drc mode via kcontrol
+*@return    Return audio drc mode
+*/
+int aml_audio_get_drc_mode();
+
 
 #ifdef __cplusplus
 }
