@@ -46,6 +46,12 @@ enum audio_drc_mode {
   DRC_OFF = 2,
 };
 
+/*
+*@brief     set hdmi connect status via kcontrol
+*@param     isconnect: connect(true) or unconnect(false)
+*@return    Return int type value,0 is setting successful and <0 is setting failed
+*/
+int aml_audio_set_hdmi_param(bool isconnect);
 
 /*
 *@brief     set volume via kcontrol

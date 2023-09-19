@@ -49,6 +49,7 @@
 #define DAC_DIGITAL_VOLUME "DAC Digital Playback Volume"
 #define DIGITAL_MODE "Audio Digital Mode"
 #define DRC_CONTROL "Audio DRC Control"
+#define HDMI_CON "Audio Output Select"
 #define DAC_DIGITAl_DEFAULT_VOLUME          (251)
 #define HEADPHONE_DAC_CHANNEL_NUM    (2)
 
@@ -727,6 +728,20 @@ static int set_dac_digital_mute(bool mute)
     }
     last_mute_state = mute;
     ALOGD("[%s:%d] DAC Digital %smute, dac_digital_volume is %d", __func__, __LINE__, mute?" ":"un", dac_digital_volume);
+    return ret;
+}
+
+int aml_audio_set_hdmi_param(bool isconnect)
+{
+    int ret = 0;
+    pthread_mutex_lock(&g_volume_lock);
+    chip_id = aml_audio_mixer_int(AML_CHIP_ID, 0, false);
+    /*s1a use this way to set hdmi status*/
+    if (AML_CHIP_ID_S1A == chip_id) {
+        ret = aml_audio_mixer_int(HDMI_CON, isconnect, true);
+        ALOGD("[%s:%d] isconnect: %d, ret: %d", __func__, __LINE__, isconnect, ret);
+    }
+    pthread_mutex_unlock(&g_volume_lock);
     return ret;
 }
 
