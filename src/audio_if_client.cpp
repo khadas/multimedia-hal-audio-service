@@ -5,7 +5,6 @@
 #include <hardware/hardware.h>
 #include <hardware/audio.h>
 #include <pthread.h>
-#include <system/audio.h>
 #include <cutils/log.h>
 
 #include <grpc/grpc.h>
