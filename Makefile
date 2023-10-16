@@ -202,12 +202,6 @@ endif
 	install -m 644 -D include/audio_if.h -t $(STAGING_DIR)/usr/include
 	install -m 644 -D include/audio_effect_if.h -t $(STAGING_DIR)/usr/include
 	install -m 644 -D include/audio_effect_params.h -t $(STAGING_DIR)/usr/include
-	for f in $(@D)/include/hardware/*.h; do \
-		install -m 644 -D $${f} -t $(STAGING_DIR)/usr/include/hardware; \
-	done
-	for f in $(@D)/include/system/*.h; do \
-		install -m 644 -D $${f} -t $(STAGING_DIR)/usr/include/system; \
-	done
 
 .PHONY: clean
 clean:
@@ -226,8 +220,6 @@ endif
 	rm -f hal_patch
 	rm -f master_vol
 	rm -f effect_tool
-	rm -rf $(STAGING_DIR)/usr/include/hardware
-	rm -rf $(STAGING_DIR)/usr/include/system
 	rm -f libaudio_client.so
 	rm -f $(TARGET_DIR)/usr/bin/audio_server
 	rm -f $(TARGET_DIR)/usr/bin/audio_client_test
