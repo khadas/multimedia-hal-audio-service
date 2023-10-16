@@ -145,6 +145,21 @@ int AML_HAL_Audio_Capabilities_Get();
 *@return    Return bool type value,TRUE is setting successful and FALSE is setting failed
 **/
 bool AML_HAL_Audio_Set_Track_Mode(enum AML_Audio_TrackMode mode);
+
+/**
+ * @brief   This APIis used to set AC4 dialog enhancer
+ * @param   Set the value of dialog enhancer, range is 0 ~ 12
+ * @return  Return bool type value, TRUE is setting successful and FALSE means setting is failed.
+**/
+
+/*the following are predefined ac4_de values*/
+#define AC4_DIALOG_ENHANCER_OFF     0
+#define AC4_DIALOG_ENHANCER_LOW     4
+#define AC4_DIALOG_ENHANCER_MEDIUM  8
+#define AC4_DIALOG_ENHANCER_HIGH    12
+
+bool AML_HAL_Audio_Set_AC4_Dialog_Enhancer(int ac4_de);
+
 #ifdef __cplusplus
 }
 #endif

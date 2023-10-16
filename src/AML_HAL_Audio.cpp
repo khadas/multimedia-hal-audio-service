@@ -33,6 +33,7 @@ extern "C" {
 #define DIGITAL_MODE_CMD "hdmi_format="
 #define TRACK_MODE_CMD "sound_track="
 #define AUDIO_SPDIF_MUTE_CMD "Audio spdif mute="
+#define MS12_RUNTIME_CMD "ms12_runtime="
 
 /** Dolby Lib Type used in Current System */
 typedef enum eDolbyLibType {
@@ -431,6 +432,37 @@ enum AML_DecodeType AML_HAL_Audio_Get_Decode_Type ( enum AML_Audio_Src_Format fo
 int AML_HAL_Audio_Capabilities_Get()
 {
     return get_output_caps();
+}
+
+bool AML_HAL_Audio_Set_AC4_Dialog_Enhancer(int ac4_de)
+{
+    int ret;
+    bool bret = true;
+    audio_hw_device_t *device = NULL;
+    char cmd[256] = {0};
+
+    ret = audio_hw_load_interface(&device);
+    if (ret) {
+        printf("audio_hw_load_interface failed: %d\n", ret);
+        return false;
+    }
+
+    ret = device->init_check(device);
+    if (ret) {
+        printf("device not inited, quit\n");
+        audio_hw_unload_interface(device);
+        return false;
+    }
+
+    snprintf(cmd, sizeof(cmd), "%s%s %d", MS12_RUNTIME_CMD, "-ac4_de", ac4_de);
+    ret = device->set_parameters(device, cmd);
+    if (ret) {
+        fprintf(stderr, "device->set_parameters: %d\n", ret);
+        bret = false;
+    }
+
+    audio_hw_unload_interface(device);
+    return bret;
 }
 
 }//extern c
