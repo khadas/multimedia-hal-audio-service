@@ -188,6 +188,8 @@ struct audio_stream_in stream_in_template = {
   .create_mmap_buffer = NULL,
   .get_mmap_position = NULL,
   .get_active_microphones = NULL,
+  .set_microphone_direction = NULL,
+  .set_microphone_field_dimension = NULL,
   .update_sink_metadata = NULL
 };
 
