@@ -91,6 +91,7 @@ enum mixer_ctl_type {
 
 static pthread_mutex_t g_volume_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t g_mute_lock = PTHREAD_MUTEX_INITIALIZER;
+static int reserved_volume = 30;
 static int chip_id = 0;
 
 static void _mixer_close(struct mixer *mixer)
@@ -788,7 +789,12 @@ int aml_audio_set_mute(int port, bool mute)
     if (port <= AUDIO_PORT_MIN || port >= AUDIO_PORT_MAX) {
         ALOGE("[%s:%d]bad port: %d", __func__, __LINE__, port);
     } else if (port == AUDIO_PORT_HDMI) {
-        ret = aml_audio_mixer_int(HDMI_OUT_MUTE, mute ? 1 : 0, true);
+        if (mute && !aml_audio_get_mute(port)) {
+            reserved_volume = aml_audio_get_volume();
+            ret = aml_audio_set_volume(0);
+        } else if (!mute) {
+            ret = aml_audio_set_volume(reserved_volume);
+        }
     } else if (port == AUDIO_PORT_HEADPHONE) {
         ret = set_dac_digital_mute(mute);
     }
@@ -804,7 +810,7 @@ bool aml_audio_get_mute(int port)
     if (port <= AUDIO_PORT_MIN || port >= AUDIO_PORT_MAX) {
         ALOGE("[%s:%d]bad port: %d", __func__, __LINE__, port);
     } else if (port == AUDIO_PORT_HDMI) {
-        ret = aml_audio_mixer_int(HDMI_OUT_MUTE, 0, false) ? true : false;
+        ret = (aml_audio_get_volume() == 0) ? true : false;
     } else if (port == AUDIO_PORT_HEADPHONE) {
         ret = aml_audio_mixer_int(DAC_DIGITAL_VOLUME, 0, false) ? false : true;
     }
