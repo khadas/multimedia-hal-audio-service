@@ -25,6 +25,8 @@
 #include <signal.h>
 #include "audio_if.h"
 
+#define AML_FRAME_SIZE 256
+
 int quit_flag = 0;
 int in_device = 0;
 audio_hw_device_t *device;
@@ -39,6 +41,7 @@ enum capture_format {
 enum capture_device {
     DEVICE_TDM = 0,
     DEVICE_PDM,
+    DEVICE_AEC,
     DEVICE_MAX
 };
 
@@ -50,21 +53,58 @@ static const char *format_str[] = {
 static const char *device_str[] = {
     "TDM",
     "PDM",
+    "AEC"
 };
+
+static unsigned int channel_mask_to_num(audio_channel_mask_t channel_mask)
+{
+    int ret = 0;
+    switch (channel_mask) {
+        case AUDIO_CHANNEL_IN_MONO:
+            ret = 1;
+            break;
+        case AUDIO_CHANNEL_IN_STEREO:
+            ret = 2;
+            break;
+        case AUDIO_CHANNEL_IN_2POINT0POINT2:
+            ret = 4;
+            break;
+        default:
+            printf("Wrong channel mask: %x!!!\n", channel_mask);
+            return 0;
+    }
+    return ret;
+}
+
+static unsigned int pcm_format_to_bits(enum capture_format format)
+{
+    switch (format) {
+        case AUDIO_FORMAT_PCM_16_BIT:
+            return 16;
+        case AUDIO_FORMAT_PCM_32_BIT:
+            return 32;
+        default:
+            printf("Wrong pcm format!!!\n");
+            return 0;
+    };
+}
+
 
 void handler(int sig)
 {
     quit_flag = 1;
 }
 
-void capture_read_input_stream()
+void capture_read_input_stream(struct audio_config *config)
 {
     int ret = 0;
     int read_len = 0;
     int flen = 0;
     char *buffer = NULL;
+    int buffer_size = AML_FRAME_SIZE * channel_mask_to_num(config->channel_mask)
+                      * (pcm_format_to_bits(config->format) >> 3);
 
-    buffer = (char *)calloc(1, 4*1024 * sizeof(char));
+    buffer = (char *)calloc(1, buffer_size * sizeof(char));
     FILE *fp = fopen("/data/hal_capture.raw", "r");
     if (fp != NULL) {
         fclose(fp);
@@ -74,10 +114,10 @@ void capture_read_input_stream()
     fp = fopen("/data/hal_capture.raw", "a+");
     if (fp) {
         while (!quit_flag) {
-            ret = stream->read(stream, buffer, 4*1024);
+            ret = stream->read(stream, buffer, buffer_size);
             read_len += (ret/1024);
-            flen = fwrite((char *)buffer, 1, 4*1024, fp);
-            memset(buffer, 0, 4*1024);
+            flen = fwrite((char *)buffer, 1, buffer_size, fp);
+            memset(buffer, 0, buffer_size);
         }
 
         printf("Capture data:%d k\n", read_len);
@@ -159,6 +199,9 @@ int capture_parse_options(int argc, char **argv, struct audio_config *config)
         case DEVICE_PDM:
             in_device = AUDIO_DEVICE_IN_BUILTIN_MIC;
             break;
+        case DEVICE_AEC:
+            in_device = AUDIO_DEVICE_IN_ECHO_REFERENCE;
+            break;
         default:
             printf("Wrong device, valid format:\n");
             return -1;
@@ -184,7 +227,7 @@ int capture_parse_options(int argc, char **argv, struct audio_config *config)
             config->channel_mask = AUDIO_CHANNEL_IN_STEREO;
             break;
         default:
-            printf("Wrong channel number, valid range [1~2], channel_mask:%d\n", config->channel_mask);
+            printf("Wrong channel number, valid range [1~2], channel_mask:%x\n", config->channel_mask);
             return -1;
     }
 
@@ -248,7 +291,7 @@ int main(int argc, char *argv[])
     }
 
     capture_open_input_stream(&config);
-    capture_read_input_stream();
+    capture_read_input_stream(&config);
     capture_close_input_stream();
 
 exit:
