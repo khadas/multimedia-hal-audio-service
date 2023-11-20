@@ -789,7 +789,7 @@ int aml_audio_set_mute(int port, bool mute)
     if (port <= AUDIO_PORT_MIN || port >= AUDIO_PORT_MAX) {
         ALOGE("[%s:%d]bad port: %d", __func__, __LINE__, port);
     } else if (port == AUDIO_PORT_HDMI) {
-        if (mute && !aml_audio_get_mute(port)) {
+        if (mute && !(aml_audio_get_volume() == 0)) {
             reserved_volume = aml_audio_get_volume();
             ret = aml_audio_set_volume(0);
         } else if (!mute) {
