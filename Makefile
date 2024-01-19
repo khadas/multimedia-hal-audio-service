@@ -1,5 +1,7 @@
-PROTO_SRCS=src/audio_service.grpc.pb.cc src/audio_service.pb.cc
-PROTO_OBJS+=$(PROTO_SRCS:.cc=.o)
+AML_BUILD_DIR?=.
+VPATH:=src:src/binder:$(AML_BUILD_DIR)/src
+PROTO_SRCS=audio_service.grpc.pb.cc audio_service.pb.cc
+PROTO_OBJS=$(PROTO_SRCS:.cc=.o)
 
 SHARED_BINDER_OBJS=src/binder/common.o
 
@@ -20,8 +22,7 @@ CLIENT_OBJS=src/audio_client.o src/audio_if_client.o
 CLIENT_OBJS+=$(PROTO_OBJS)
 endif
 endif
-#HAL_APLUG_OBJS = hal_aplug/hal_aplug.o
-AMLAUDIOSET_OBJS = src/AML_Audio_Setting.o
+AMLAUDIOSET_OBJS = $(AML_BUILD_DIR)/AML_Audio_Setting.o
 
 ifeq ($(use_binder),y)
 SERVER_OBJS+=$(SHARED_BINDER_OBJS)
@@ -29,29 +30,29 @@ else
 SERVER_OBJS+=$(PROTO_OBJS)
 endif
 
-TEST_PCM_OBJS=src/test.o
-TEST_DOLBY_OBJS=src/test_ac3.o
-TEST_HALPLAY_OBJS=src/halplay.o
-TEST_HALCAPTURE_OBJS=src/hal_capture.o
-TEST_AMLAUDIOHAL_OBJS=src/test_amlaudiohal.o
-TEST_AUDIOSET_OBJS=src/test_audiosetting.o
-TEST_MS12_OBJS=src/dap_setting.o
-TEST_SPEAKER_DELAY_OBJS=src/speaker_delay.o
-TEST_DIGITAL_MODE_OBJS=src/digital_mode.o
-TEST_ARC_TEST_OBJS=src/test_arc.o
-TEST_START_ARC_OBJS=src/start_arc.o
-TEST_HAL_PARAM_OBJS=src/hal_param.o
-TEST_HAL_DUMP_OBJS=src/hal_dump.o
-TEST_HAL_PATCH_OBJS=src/hal_patch.o
-TEST_MASTER_VOL_OBJS=src/master_vol.o
-EFFECT_TOOL_OBJS=src/effect_tool.o
-TEST_AUDIO_CLIENT_BINDER_OBJS=src/binder/audio_client_binder_test.o
+TEST_PCM_OBJS=$(AML_BUILD_DIR)/test.o
+TEST_DOLBY_OBJS=$(AML_BUILD_DIR)/test_ac3.o
+TEST_HALPLAY_OBJS=$(AML_BUILD_DIR)/halplay.o
+TEST_HALCAPTURE_OBJS=$(AML_BUILD_DIR)/hal_capture.o
+TEST_AMLAUDIOHAL_OBJS=$(AML_BUILD_DIR)/test_amlaudiohal.o
+TEST_AUDIOSET_OBJS=$(AML_BUILD_DIR)/test_audiosetting.o
+TEST_MS12_OBJS=$(AML_BUILD_DIR)/dap_setting.o
+TEST_SPEAKER_DELAY_OBJS=$(AML_BUILD_DIR)/speaker_delay.o
+TEST_DIGITAL_MODE_OBJS=$(AML_BUILD_DIR)/digital_mode.o
+TEST_ARC_TEST_OBJS=$(AML_BUILD_DIR)/test_arc.o
+TEST_START_ARC_OBJS=$(AML_BUILD_DIR)/start_arc.o
+TEST_HAL_PARAM_OBJS=$(AML_BUILD_DIR)/hal_param.o
+TEST_HAL_DUMP_OBJS=$(AML_BUILD_DIR)/hal_dump.o
+TEST_HAL_PATCH_OBJS=$(AML_BUILD_DIR)/hal_patch.o
+TEST_MASTER_VOL_OBJS=$(AML_BUILD_DIR)/master_vol.o
+EFFECT_TOOL_OBJS=$(AML_BUILD_DIR)/effect_tool.o
+TEST_AUDIO_CLIENT_BINDER_OBJS=$(AML_BUILD_DIR)/binder/audio_client_binder_test.o
 
 PROTOC=$(HOST_DIR)/bin/protoc
 PROTOC_INC=$(HOST_DIR)/include
 GRPC_CPP_PLUGIN_PATH=$(HOST_DIR)/bin/grpc_cpp_plugin
 
-CFLAGS += -Wall -fPIC -O2 -I$(PROTOC_INC) -I./include -I. -I./src
+CFLAGS += -Wall -fPIC -O2 -I$(PROTOC_INC) -I./include -I. -I./src -I$(AML_BUILD_DIR)/src -I$(AML_BUILD_DIR)
 ifeq ($(aplugin),y)
 	CFLAGS+= -DPIC
 endif
@@ -65,25 +66,28 @@ SC_LDFLAGS+=-Wl,--no-as-needed -lgrpc++_unsecure -lprotobuf -lboost_system -lama
 LDFLAGS+= -Wl,--no-as-needed -llog -ldl -lrt -lpthread -lstdc++ -pthread
 endif
 
-%.grpc.pb.cc %.grpc.pb.h: %.proto
-	$(PROTOC) -I=. -I=$(PROTOC_INC) --grpc_out=. --plugin=protoc-gen-grpc=$(GRPC_CPP_PLUGIN_PATH) $<
+PROTO_SRCS_DIR = src/ $(AML_BUILD_DIR)/src/ src/binder/
+INCLUDE_DIR = include/ $(AML_BUILD_DIR)/src
 
-%.pb.cc %.pb.h: %.proto
-	$(PROTOC) -I=. -I=$(PROTOC_INC) --cpp_out=. --plugin=protoc-gen-grpc=$(GRPC_CPP_PLUGIN_PATH) $<
+$(AML_BUILD_DIR)/%.grpc.pb.cc $(AML_BUILD_DIR)/%.grpc.pb.h: %.proto
+	$(PROTOC) -I=. -I=$(PROTOC_INC) --grpc_out=$(AML_BUILD_DIR) --plugin=protoc-gen-grpc=$(GRPC_CPP_PLUGIN_PATH) $<
 
-%.pb.o: %.pb.cc %.pb.h
+$(AML_BUILD_DIR)/%.pb.cc $(AML_BUILD_DIR)/%.pb.h: %.proto
+	$(PROTOC) -I=. -I=$(PROTOC_INC) --cpp_out=$(AML_BUILD_DIR) --plugin=protoc-gen-grpc=$(GRPC_CPP_PLUGIN_PATH) $<
+
+$(AML_BUILD_DIR)/%.pb.o: $(AML_BUILD_DIR)/src/%.pb.cc $(AML_BUILD_DIR)/src/%.pb.h | $(AML_BUILD_DIR)
 	$(CC) -c $(CFLAGS) $(CXXFLAGS) -o $@ $<
 
-%.o: %.cpp
+$(AML_BUILD_DIR)/%.o: %.cpp | $(AML_BUILD_DIR)
 	$(CC) -c $(CFLAGS) $(CXXFLAGS) -o $@ $<
 
-%.o: %.c
+$(AML_BUILD_DIR)/%.o: %.c | $(AML_BUILD_DIR)
 	$(CC) -c $(CFLAGS) -o $@ $<
 
-src/audio_service.grpc.pb.cc: src/audio_service.pb.h
-src/audio_server.cpp: src/audio_service.pb.h src/audio_service.grpc.pb.cc
-src/audio_client.cpp: src/audio_service.pb.h src/audio_service.grpc.pb.cc
-src/audio_if_client.cpp: src/audio_service.pb.h src/audio_service.grpc.pb.cc
+$(AML_BUILD_DIR)/src/audio_service.grpc.pb.cc: $(AML_BUILD_DIR)/src/audio_service.pb.h
+audio_server.cpp: $(AML_BUILD_DIR)/src/audio_service.pb.h $(AML_BUILD_DIR)/src/audio_service.grpc.pb.cc
+audio_client.cpp: $(AML_BUILD_DIR)/src/audio_service.pb.h $(AML_BUILD_DIR)/src/audio_service.grpc.pb.cc
+audio_if_client.cpp: $(AML_BUILD_DIR)/src/audio_service.pb.h $(AML_BUILD_DIR)/src/audio_service.grpc.pb.cc
 
 ifeq ($(rm_audioserver),y)
 obj= libaudio_client.so libamlaudiosetting.so audio_client_test audio_client_test_ac3 halplay hal_capture dap_setting speaker_delay digital_mode test_arc start_arc hal_param hal_dump hal_patch master_vol test_audiosetting
@@ -99,104 +103,109 @@ ifeq ($(aplugin),y)
 	obj+= libasound_module_pcm_ahal.so
 endif
 
-all:$(obj)
+CLIENT_OBJS_BUILD = $(patsubst %.o, $(AML_BUILD_DIR)/%.o, $(notdir $(CLIENT_OBJS)))
+SERVER_OBJS_BUILD = $(patsubst %.o, $(AML_BUILD_DIR)/%.o, $(notdir $(SERVER_OBJS)))
+target_obj = $(addprefix $(AML_BUILD_DIR)/, $(obj))
+$(info target_obj is ${target_obj})
+
+all:$(target_obj)
 
 ifeq ($(rm_audioserver),y)
-libaudio_client.so: $(CLIENT_OBJS)
+$(AML_BUILD_DIR)/libaudio_client.so: $(CLIENT_OBJS_BUILD)
 	$(CC) $(CFLAGS) $(LDFLAGS) -shared -o $@ $^
 
-libamlaudiosetting.so:$(AMLAUDIOSET_OBJS)
+$(AML_BUILD_DIR)/libamlaudiosetting.so:$(AMLAUDIOSET_OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -shared -o $@ $^
 
-test_audiosetting: $(TEST_AUDIOSET_OBJS) libamlaudiosetting.so
+$(AML_BUILD_DIR)/test_audiosetting: $(TEST_AUDIOSET_OBJS) $(AML_BUILD_DIR)/libamlaudiosetting.so
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
 else
-audio_server: $(SERVER_OBJS)
+$(AML_BUILD_DIR)/audio_server: $(SERVER_OBJS_BUILD) | $(AML_BUILD_DIR)
 	$(CC) $(CFLAGS) $(SC_LDFLAGS) -o $@ $^
 
-libaudio_client.so: $(CLIENT_OBJS)
-	$(CC) $(CFLAGS) $(SC_LDFLAGS) -shared -o $@ $^
+$(AML_BUILD_DIR)/libaudio_client.so: $(CLIENT_OBJS_BUILD) | $(AML_BUILD_DIR)
+	$(CC) $(CFLAGS) $(CXXFLAGS) $(SC_LDFLAGS) -shared -o $@ $^
 endif
 
-libasound_module_pcm_ahal.so: libaudio_client.so
+$(AML_BUILD_DIR)/libasound_module_pcm_ahal.so: $(AML_BUILD_DIR)/libaudio_client.so
 	$(CC) $(CFLAGS) $(SC_LDFLAGS) -lasound -shared -o $@ $^
 
-audio_client_test: $(TEST_PCM_OBJS) libaudio_client.so
+$(AML_BUILD_DIR)/audio_client_test: $(TEST_PCM_OBJS) $(AML_BUILD_DIR)/libaudio_client.so
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
 
-audio_client_test_ac3: $(TEST_DOLBY_OBJS) libaudio_client.so
+$(AML_BUILD_DIR)/audio_client_test_ac3: $(TEST_DOLBY_OBJS) $(AML_BUILD_DIR)/libaudio_client.so
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
 
-halplay: $(TEST_HALPLAY_OBJS) libaudio_client.so
+$(AML_BUILD_DIR)/halplay: $(TEST_HALPLAY_OBJS) $(AML_BUILD_DIR)/libaudio_client.so
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
 
-hal_capture: $(TEST_HALCAPTURE_OBJS) libaudio_client.so
+$(AML_BUILD_DIR)/hal_capture: $(TEST_HALCAPTURE_OBJS) $(AML_BUILD_DIR)/libaudio_client.so
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
 
-dap_setting: $(TEST_MS12_OBJS) libaudio_client.so
+$(AML_BUILD_DIR)/dap_setting: $(TEST_MS12_OBJS) $(AML_BUILD_DIR)/libaudio_client.so
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
 
-speaker_delay: $(TEST_SPEAKER_DELAY_OBJS) libaudio_client.so
+$(AML_BUILD_DIR)/speaker_delay: $(TEST_SPEAKER_DELAY_OBJS) $(AML_BUILD_DIR)/libaudio_client.so
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
 
-digital_mode: $(TEST_DIGITAL_MODE_OBJS) libaudio_client.so
+$(AML_BUILD_DIR)/digital_mode: $(TEST_DIGITAL_MODE_OBJS) $(AML_BUILD_DIR)/libaudio_client.so
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
 
-test_arc: $(TEST_ARC_TEST_OBJS) libaudio_client.so
+$(AML_BUILD_DIR)/test_arc: $(TEST_ARC_TEST_OBJS) $(AML_BUILD_DIR)/libaudio_client.so
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
 
-start_arc: $(TEST_START_ARC_OBJS)
+$(AML_BUILD_DIR)/start_arc: $(TEST_START_ARC_OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
 
-hal_param: $(TEST_HAL_PARAM_OBJS) libaudio_client.so
+$(AML_BUILD_DIR)/hal_param: $(TEST_HAL_PARAM_OBJS) $(AML_BUILD_DIR)/libaudio_client.so
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
 
-hal_dump: $(TEST_HAL_DUMP_OBJS) libaudio_client.so
+$(AML_BUILD_DIR)/hal_dump: $(TEST_HAL_DUMP_OBJS) $(AML_BUILD_DIR)/libaudio_client.so
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
 
-hal_patch: $(TEST_HAL_PATCH_OBJS) libaudio_client.so
+$(AML_BUILD_DIR)/hal_patch: $(TEST_HAL_PATCH_OBJS) $(AML_BUILD_DIR)/libaudio_client.so
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
 
-master_vol: $(TEST_MASTER_VOL_OBJS) libaudio_client.so
+$(AML_BUILD_DIR)/master_vol: $(TEST_MASTER_VOL_OBJS) $(AML_BUILD_DIR)/libaudio_client.so
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
 
-effect_tool: $(EFFECT_TOOL_OBJS) libaudio_client.so
+$(AML_BUILD_DIR)/effect_tool: $(EFFECT_TOOL_OBJS) $(AML_BUILD_DIR)/libaudio_client.so
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
 
-audio_client_binder_test: $(TEST_AUDIO_CLIENT_BINDER_OBJS) libaudio_client.so
+$(AML_BUILD_DIR)/audio_client_binder_test: $(TEST_AUDIO_CLIENT_BINDER_OBJS) $(AML_BUILD_DIR)/libaudio_client.so
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
 
 .PHONY: install
 install:
 ifneq ($(rm_audioserver),y)
-	install -m 755 -D audio_server -t $(TARGET_DIR)/usr/bin/
-	install -m 755 -D audio_client_test -t $(TARGET_DIR)/usr/bin/
-	install -m 755 -D audio_client_test_ac3 $(TARGET_DIR)/usr/bin/
-	install -m 755 -D effect_tool $(TARGET_DIR)/usr/bin/
+	install -m 755 -D $(AML_BUILD_DIR)/audio_server -t $(TARGET_DIR)/usr/bin/
+	install -m 755 -D $(AML_BUILD_DIR)/audio_client_test -t $(TARGET_DIR)/usr/bin/
+	install -m 755 -D $(AML_BUILD_DIR)/audio_client_test_ac3 $(TARGET_DIR)/usr/bin/
+	install -m 755 -D $(AML_BUILD_DIR)/effect_tool $(TARGET_DIR)/usr/bin/
 else
-	install -m 755 -D test_audiosetting -t $(TARGET_DIR)/usr/bin/
-	install -m 644 -D libamlaudiosetting.so -t $(STAGING_DIR)/usr/lib/
-	install -m 644 -D libamlaudiosetting.so -t $(TARGET_DIR)/usr/lib/
+	install -m 755 -D $(AML_BUILD_DIR)/test_audiosetting -t $(TARGET_DIR)/usr/bin/
+	install -m 644 -D $(AML_BUILD_DIR)/libamlaudiosetting.so -t $(STAGING_DIR)/usr/lib/
+	install -m 644 -D $(AML_BUILD_DIR)/libamlaudiosetting.so -t $(TARGET_DIR)/usr/lib/
 	install -m 644 -D include/AML_Audio_Setting.h -t $(STAGING_DIR)/usr/include
 endif
 ifeq ($(use_binder),y)
-	install -m 755 -D audio_client_binder_test -t $(TARGET_DIR)/usr/bin/
+	install -m 755 -D $(AML_BUILD_DIR)/audio_client_binder_test -t $(TARGET_DIR)/usr/bin/
 endif
-	install -m 755 -D halplay $(TARGET_DIR)/usr/bin/
-	install -m 755 -D hal_capture $(TARGET_DIR)/usr/bin/
-	install -m 755 -D dap_setting $(TARGET_DIR)/usr/bin/
-	install -m 755 -D speaker_delay $(TARGET_DIR)/usr/bin/
-	install -m 755 -D digital_mode $(TARGET_DIR)/usr/bin/
-	install -m 755 -D test_arc $(TARGET_DIR)/usr/bin/
-	install -m 755 -D start_arc $(TARGET_DIR)/usr/bin/
-	install -m 755 -D hal_param $(TARGET_DIR)/usr/bin/
-	install -m 755 -D hal_dump $(TARGET_DIR)/usr/bin/
-	install -m 755 -D hal_patch $(TARGET_DIR)/usr/bin/
-	install -m 755 -D master_vol $(TARGET_DIR)/usr/bin/
-	install -m 644 -D libaudio_client.so -t $(TARGET_DIR)/usr/lib/
-	install -m 644 -D libaudio_client.so -t $(STAGING_DIR)/usr/lib/
+	install -m 755 -D $(AML_BUILD_DIR)/halplay $(TARGET_DIR)/usr/bin/
+	install -m 755 -D $(AML_BUILD_DIR)/hal_capture $(TARGET_DIR)/usr/bin/
+	install -m 755 -D $(AML_BUILD_DIR)/dap_setting $(TARGET_DIR)/usr/bin/
+	install -m 755 -D $(AML_BUILD_DIR)/speaker_delay $(TARGET_DIR)/usr/bin/
+	install -m 755 -D $(AML_BUILD_DIR)/digital_mode $(TARGET_DIR)/usr/bin/
+	install -m 755 -D $(AML_BUILD_DIR)/test_arc $(TARGET_DIR)/usr/bin/
+	install -m 755 -D $(AML_BUILD_DIR)/start_arc $(TARGET_DIR)/usr/bin/
+	install -m 755 -D $(AML_BUILD_DIR)/hal_param $(TARGET_DIR)/usr/bin/
+	install -m 755 -D $(AML_BUILD_DIR)/hal_dump $(TARGET_DIR)/usr/bin/
+	install -m 755 -D $(AML_BUILD_DIR)/hal_patch $(TARGET_DIR)/usr/bin/
+	install -m 755 -D $(AML_BUILD_DIR)/master_vol $(TARGET_DIR)/usr/bin/
+	install -m 644 -D $(AML_BUILD_DIR)/libaudio_client.so -t $(TARGET_DIR)/usr/lib/
+	install -m 644 -D $(AML_BUILD_DIR)/libaudio_client.so -t $(STAGING_DIR)/usr/lib/
 ifeq ($(aplugin),y)
-	install -m 644 -D libasound_module_pcm_ahal.so -t $(TARGET_DIR)/usr/lib/alsa-lib/
+	install -m 644 -D $(AML_BUILD_DIR)/libasound_module_pcm_ahal.so -t $(TARGET_DIR)/usr/lib/alsa-lib/
 endif
 	install -m 644 -D include/audio_if_client.h -t $(STAGING_DIR)/usr/include
 	install -m 644 -D include/audio_if.h -t $(STAGING_DIR)/usr/include
@@ -205,22 +214,23 @@ endif
 
 .PHONY: clean
 clean:
-	rm -f audio_server
-	rm -f audio_client_test
-	rm -f audio_client_test_ac3
+	rm -f $(AML_BUILD_DIR)/audio_server
+	rm -f $(AML_BUILD_DIR)/audio_client_test
+	rm -f $(AML_BUILD_DIR)/audio_client_test_ac3
 ifeq ($(use_binder),y)
-	rm -f audio_client_binder_test
+	rm -f $(AML_BUILD_DIR)/audio_client_binder_test
 endif
-	rm -f halplay
-	rm -f hal_capture
-	rm -f test_arc
-	rm -f start_arc
-	rm -f hal_param
-	rm -f hal_dump
-	rm -f hal_patch
-	rm -f master_vol
-	rm -f effect_tool
-	rm -f libaudio_client.so
+	rm -f $(AML_BUILD_DIR)/*.o
+	rm -f $(AML_BUILD_DIR)/halplay
+	rm -f $(AML_BUILD_DIR)/hal_capture
+	rm -f $(AML_BUILD_DIR)/test_arc
+	rm -f $(AML_BUILD_DIR)/start_arc
+	rm -f $(AML_BUILD_DIR)/hal_param
+	rm -f $(AML_BUILD_DIR)/hal_dump
+	rm -f $(AML_BUILD_DIR)/hal_patch
+	rm -f $(AML_BUILD_DIR)/master_vol
+	rm -f $(AML_BUILD_DIR)/effect_tool
+	rm -f $(AML_BUILD_DIR)/libaudio_client.so
 	rm -f $(TARGET_DIR)/usr/bin/audio_server
 	rm -f $(TARGET_DIR)/usr/bin/audio_client_test
 	rm -f $(TARGET_DIR)/usr/bin/audio_client_test_ac3
