@@ -108,6 +108,8 @@ SERVER_OBJS_BUILD = $(patsubst %.o, $(AML_BUILD_DIR)/%.o, $(notdir $(SERVER_OBJS
 target_obj = $(addprefix $(AML_BUILD_DIR)/, $(obj))
 $(info target_obj is ${target_obj})
 
+vpath %.so $(AML_BUILD_DIR)
+
 all:$(target_obj)
 
 ifeq ($(rm_audioserver),y)
@@ -118,62 +120,62 @@ $(AML_BUILD_DIR)/libamlaudiosetting.so:$(AMLAUDIOSET_OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -shared -o $@ $^
 
 $(AML_BUILD_DIR)/test_audiosetting: $(TEST_AUDIOSET_OBJS) $(AML_BUILD_DIR)/libamlaudiosetting.so
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) $(LDFLAGS) -L$(AML_BUILD_DIR) -lamlaudiosetting -o $@ $^
 else
-$(AML_BUILD_DIR)/audio_server: $(SERVER_OBJS_BUILD) | $(AML_BUILD_DIR)
+$(AML_BUILD_DIR)/audio_server: $(SERVER_OBJS_BUILD)
 	$(CC) $(CFLAGS) $(SC_LDFLAGS) -o $@ $^
 
-$(AML_BUILD_DIR)/libaudio_client.so: $(CLIENT_OBJS_BUILD) | $(AML_BUILD_DIR)
+$(AML_BUILD_DIR)/libaudio_client.so: $(CLIENT_OBJS_BUILD)
 	$(CC) $(CFLAGS) $(CXXFLAGS) $(SC_LDFLAGS) -shared -o $@ $^
 endif
 
 $(AML_BUILD_DIR)/libasound_module_pcm_ahal.so: $(AML_BUILD_DIR)/libaudio_client.so
-	$(CC) $(CFLAGS) $(SC_LDFLAGS) -lasound -shared -o $@ $^
+	$(CC) $(CFLAGS) $(SC_LDFLAGS) -lasound -shared -L$(AML_BUILD_DIR) -laudio_client -o $@
 
 $(AML_BUILD_DIR)/audio_client_test: $(TEST_PCM_OBJS) $(AML_BUILD_DIR)/libaudio_client.so
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) $(LDFLAGS) -L$(AML_BUILD_DIR) -laudio_client -o $@ $(TEST_PCM_OBJS)
 
 $(AML_BUILD_DIR)/audio_client_test_ac3: $(TEST_DOLBY_OBJS) $(AML_BUILD_DIR)/libaudio_client.so
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) $(LDFLAGS) -L$(AML_BUILD_DIR) -laudio_client -o $@ $(TEST_DOLBY_OBJS)
 
 $(AML_BUILD_DIR)/halplay: $(TEST_HALPLAY_OBJS) $(AML_BUILD_DIR)/libaudio_client.so
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) $(LDFLAGS) -L$(AML_BUILD_DIR) -laudio_client -o $@ $(TEST_HALPLAY_OBJS)
 
 $(AML_BUILD_DIR)/hal_capture: $(TEST_HALCAPTURE_OBJS) $(AML_BUILD_DIR)/libaudio_client.so
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) $(LDFLAGS) -L$(AML_BUILD_DIR) -laudio_client -o $@ $(TEST_HALCAPTURE_OBJS)
 
 $(AML_BUILD_DIR)/dap_setting: $(TEST_MS12_OBJS) $(AML_BUILD_DIR)/libaudio_client.so
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) $(LDFLAGS) -L$(AML_BUILD_DIR) -laudio_client -o $@ $(TEST_MS12_OBJS)
 
 $(AML_BUILD_DIR)/speaker_delay: $(TEST_SPEAKER_DELAY_OBJS) $(AML_BUILD_DIR)/libaudio_client.so
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) $(LDFLAGS) -L$(AML_BUILD_DIR) -laudio_client -o $@ $(TEST_SPEAKER_DELAY_OBJS)
 
 $(AML_BUILD_DIR)/digital_mode: $(TEST_DIGITAL_MODE_OBJS) $(AML_BUILD_DIR)/libaudio_client.so
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) $(LDFLAGS) -L$(AML_BUILD_DIR) -laudio_client -o $@ $(TEST_DIGITAL_MODE_OBJS)
 
 $(AML_BUILD_DIR)/test_arc: $(TEST_ARC_TEST_OBJS) $(AML_BUILD_DIR)/libaudio_client.so
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) $(LDFLAGS) -L$(AML_BUILD_DIR) -laudio_client -o $@ $(TEST_ARC_TEST_OBJS)
 
 $(AML_BUILD_DIR)/start_arc: $(TEST_START_ARC_OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
 
 $(AML_BUILD_DIR)/hal_param: $(TEST_HAL_PARAM_OBJS) $(AML_BUILD_DIR)/libaudio_client.so
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) $(LDFLAGS) -L$(AML_BUILD_DIR) -laudio_client -o $@ $(TEST_HAL_PARAM_OBJS)
 
 $(AML_BUILD_DIR)/hal_dump: $(TEST_HAL_DUMP_OBJS) $(AML_BUILD_DIR)/libaudio_client.so
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) $(LDFLAGS) -L$(AML_BUILD_DIR) -laudio_client -o $@ $(TEST_HAL_DUMP_OBJS)
 
 $(AML_BUILD_DIR)/hal_patch: $(TEST_HAL_PATCH_OBJS) $(AML_BUILD_DIR)/libaudio_client.so
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) $(LDFLAGS) -L$(AML_BUILD_DIR) -laudio_client -o $@ $(TEST_HAL_PATCH_OBJS)
 
 $(AML_BUILD_DIR)/master_vol: $(TEST_MASTER_VOL_OBJS) $(AML_BUILD_DIR)/libaudio_client.so
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) $(LDFLAGS) -L$(AML_BUILD_DIR) -laudio_client -o $@ $(TEST_MASTER_VOL_OBJS)
 
 $(AML_BUILD_DIR)/effect_tool: $(EFFECT_TOOL_OBJS) $(AML_BUILD_DIR)/libaudio_client.so
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) $(LDFLAGS) -L$(AML_BUILD_DIR) -laudio_client -o $@ $(EFFECT_TOOL_OBJS)
 
 $(AML_BUILD_DIR)/audio_client_binder_test: $(TEST_AUDIO_CLIENT_BINDER_OBJS) $(AML_BUILD_DIR)/libaudio_client.so
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) $(LDFLAGS) -L$(AML_BUILD_DIR) -laudio_client -o $@ $(TEST_AUDIO_CLIENT_BINDER_OBJS)
 
 .PHONY: install
 install:
