@@ -46,7 +46,7 @@ TEST_HAL_DUMP_OBJS=$(AML_BUILD_DIR)/hal_dump.o
 TEST_HAL_PATCH_OBJS=$(AML_BUILD_DIR)/hal_patch.o
 TEST_MASTER_VOL_OBJS=$(AML_BUILD_DIR)/master_vol.o
 EFFECT_TOOL_OBJS=$(AML_BUILD_DIR)/effect_tool.o
-TEST_AUDIO_CLIENT_BINDER_OBJS=$(AML_BUILD_DIR)/binder/audio_client_binder_test.o
+TEST_AUDIO_CLIENT_BINDER_OBJS=$(AML_BUILD_DIR)/audio_client_binder_test.o
 
 PROTOC=$(HOST_DIR)/bin/protoc
 PROTOC_INC=$(HOST_DIR)/include

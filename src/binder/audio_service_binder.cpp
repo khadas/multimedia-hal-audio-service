@@ -1055,21 +1055,22 @@ void AudioServiceBinder::readAudioPortConfigsFromParcel(unsigned int numConfigs,
         case CMD_AS_ESP: {
             aml_audio_effect_type_e type = (aml_audio_effect_type_e) data.readInt32();
             uint32_t cmdSize = data.readUint32();
-            const char* pCmdDataCStr = data.readCString();
-            void* pCmdData = static_cast<void*>(const_cast<char*>(pCmdDataCStr));
+            void* pCmdData = calloc(cmdSize, 1);
+            data.read(pCmdData, cmdSize);
             uint32_t replySize = data.readUint32();
 
             uint32_t pReplyData;
             int ret = Effect_set_parameters(type, cmdSize, pCmdData, replySize, pReplyData);
             reply->writeUint32(pReplyData);
             reply->writeInt32(ret);
+            free(pCmdData);
             break;
         }
         case CMD_AS_EGP: {
             aml_audio_effect_type_e type = (aml_audio_effect_type_e) data.readInt32();
             uint32_t cmdSize = data.readUint32();
-            const char* pCmdDataCStr = data.readCString();
-            void* pCmdData = static_cast<void*>(const_cast<char*>(pCmdDataCStr));
+            void* pCmdData = calloc(cmdSize, 1);
+            data.read(pCmdData, cmdSize);
             uint32_t replySize = data.readUint32();
 
             void* pReplyData = malloc(replySize);
@@ -1082,6 +1083,7 @@ void AudioServiceBinder::readAudioPortConfigsFromParcel(unsigned int numConfigs,
             }
 
             free(pReplyData);
+            free(pCmdData);
             pReplyData = nullptr;
             break;
         }

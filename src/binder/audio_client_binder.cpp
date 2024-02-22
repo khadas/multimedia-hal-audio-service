@@ -689,8 +689,8 @@ int AudioClientBinder::Effect_set_parameters(aml_audio_effect_type_e type, effec
     uint32_t cmd_size = sizeof(effect_param_t) + psize;
     send.writeUint32(cmd_size);
 
-    const char* cmd_data = param->data;
-    send.writeCString(cmd_data);
+    void* cmd_data = (void*)param;
+    send.write(cmd_data, cmd_size);
 
     uint32_t reply_size = sizeof(int);
     send.writeUint32(reply_size);
@@ -717,8 +717,8 @@ int AudioClientBinder::Effect_get_parameters(aml_audio_effect_type_e type, effec
     uint32_t cmd_size = sizeof(effect_param_t) + param->psize;
     send.writeUint32(cmd_size);
 
-    const char* cmd_data = param->data;
-    send.writeCString(cmd_data);
+    void* cmd_data = (void*)param;
+    send.write(cmd_data, cmd_size);
 
     uint32_t reply_size = psize;
     send.writeUint32(reply_size);
