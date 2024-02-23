@@ -101,6 +101,18 @@ static void funmap(unsigned char *p, int size, int fd)
         close(fd);
 }
 
+int debug = 0;
+static void get_buffer_size(struct audio_stream_out *stream)
+{
+    int buffer_size = 0;
+    int buffer_latency = 0;
+    if (debug) {
+        buffer_size = stream->common.get_buffer_size(&(stream->common));
+        buffer_latency = stream->get_latency(stream);
+        printf("buffer_size: %d, buffer_latency: %d.", buffer_size, buffer_latency);
+    }
+}
+
 int isstop = 0;
 static int test_stream(struct audio_stream_out *stream, unsigned char *buf, int size)
 {
@@ -133,6 +145,8 @@ static int test_stream(struct audio_stream_out *stream, unsigned char *buf, int 
         printf("stream writing %d \n", s);
         len -= s;
         data += s;
+
+        get_buffer_size(stream);
     }
     isstop = 0;
     return 0;
@@ -177,12 +191,12 @@ int main(int argc, char **argv)
     int fd = -1;
 
     if (argc == 1) {
-        printf("Usage: halplay -f <format> -c <channel number> -r <sample rate> <filename>\n");
+        printf("Usage: halplay -f <format> -c <channel number> -r <sample rate> -d <debug flag> <filename> \n");
         printf("more param Info: halplay -h\n");
         return 0;
     }
 
-    while ((c = getopt(argc, argv, "f:c:r:h")) != -1) {
+    while ((c = getopt(argc, argv, "f:c:r:d:h")) != -1) {
         switch (c) {
             case 'f':
                 format = atoi(optarg);
@@ -192,6 +206,9 @@ int main(int argc, char **argv)
                 break;
             case 'r':
                 sr = atoi(optarg);
+                break;
+            case 'd':
+                debug = atoi(optarg);
                 break;
             case 'h':
                 help = 1;
@@ -204,7 +221,7 @@ int main(int argc, char **argv)
         }
     }
     if (help == 1) {
-        printf("Usage: halplay -f <format> -c <channel number> -r <sample rate> <filename>\n");
+        printf("Usage: halplay -f <format> -c <channel number> -r <sample rate> -d <debug flag> <filename>\n");
         printf("\n-h,           help\n");
         printf("-f,           sample format\n");
         printf("-c,           channels\n");
@@ -214,6 +231,7 @@ int main(int argc, char **argv)
         printf("the available params for PCM16 and PCM32 are:\n");
         printf("-c 1,2,6,8\n");
         printf("-r 32000,44100,48000\n");
+        printf("-d debug flag: 1/0\n");
         return 0;
     }
     if (optind < argc) {
