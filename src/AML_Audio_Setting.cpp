@@ -50,6 +50,7 @@
 #define DIGITAL_MODE "Audio Digital Mode"
 #define DRC_CONTROL "Audio DRC Control"
 #define HDMI_CON "Audio Output Select"
+#define SPDIF_FORMAT "Audio spdif format"
 #define DAC_DIGITAl_DEFAULT_VOLUME          (251)
 #define HEADPHONE_DAC_CHANNEL_NUM    (2)
 
@@ -789,11 +790,15 @@ int aml_audio_set_mute(int port, bool mute)
     if (port <= AUDIO_PORT_MIN || port >= AUDIO_PORT_MAX) {
         ALOGE("[%s:%d]bad port: %d", __func__, __LINE__, port);
     } else if (port == AUDIO_PORT_HDMI) {
-        if (mute && !(aml_audio_get_volume() == 0)) {
-            reserved_volume = aml_audio_get_volume();
-            ret = aml_audio_set_volume(0);
-        } else if (!mute) {
-            ret = aml_audio_set_volume(reserved_volume);
+        if (aml_audio_get_spdif_format() == AUD_CODEC_TYPE_STEREO_PCM) {
+            if (mute && !(aml_audio_get_volume() == 0)) {
+                reserved_volume = aml_audio_get_volume();
+                ret = aml_audio_set_volume(0);
+            } else if (!mute) {
+                ret = aml_audio_set_volume(reserved_volume);
+            }
+        } else {
+            ret = aml_audio_mixer_int(HDMI_OUT_MUTE, mute ? 1 : 0, true);
         }
     } else if (port == AUDIO_PORT_HEADPHONE) {
         ret = set_dac_digital_mute(mute);
@@ -810,7 +815,11 @@ bool aml_audio_get_mute(int port)
     if (port <= AUDIO_PORT_MIN || port >= AUDIO_PORT_MAX) {
         ALOGE("[%s:%d]bad port: %d", __func__, __LINE__, port);
     } else if (port == AUDIO_PORT_HDMI) {
-        ret = (aml_audio_get_volume() == 0) ? true : false;
+        if (aml_audio_get_spdif_format() == AUD_CODEC_TYPE_STEREO_PCM) {
+            ret = (aml_audio_get_volume() == 0) ? true : false;
+        } else {
+            ret = aml_audio_mixer_int(HDMI_OUT_MUTE, 0, false) ? true : false;
+        }
     } else if (port == AUDIO_PORT_HEADPHONE) {
         ret = aml_audio_mixer_int(DAC_DIGITAL_VOLUME, 0, false) ? false : true;
     }
@@ -881,6 +890,17 @@ int aml_audio_get_drc_mode()
     else
         ret = (drc_control&3 == DRC_MODE_LINE) ? DRC_LINE : DRC_RF;
     ALOGD("[%s:%d] mode: %d", __func__, __LINE__, ret);
+    pthread_mutex_unlock(&g_volume_lock);
+
+    return ret;
+}
+
+int aml_audio_get_spdif_format()
+{
+    pthread_mutex_lock(&g_volume_lock);
+    int ret = 0;
+    ret = aml_audio_mixer_int(SPDIF_FORMAT, 0, false);
+    ALOGD("[%s:%d] ret: %x.", __func__, __LINE__, ret);
     pthread_mutex_unlock(&g_volume_lock);
 
     return ret;

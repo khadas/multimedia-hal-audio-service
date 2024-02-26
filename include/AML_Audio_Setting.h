@@ -46,6 +46,21 @@ enum audio_drc_mode {
   DRC_OFF = 2,
 };
 
+enum aud_codec_types {
+  AUD_CODEC_TYPE_STEREO_PCM     = 0x0,
+  AUD_CODEC_TYPE_DTS_RAW_MODE   = 0x1,
+  AUD_CODEC_TYPE_AC3            = 0x2,
+  AUD_CODEC_TYPE_DTS            = 0x3,
+  AUD_CODEC_TYPE_EAC3           = 0x4,
+  AUD_CODEC_TYPE_DTS_HD         = 0x5,
+  AUD_CODEC_TYPE_MULTI_LPCM     = 0x6,
+  AUD_CODEC_TYPE_TRUEHD         = 0x7,
+  AUD_CODEC_TYPE_DTS_HD_MA      = 0x8,
+  AUD_CODEC_TYPE_HSR_STEREO_PCM = 0x9,
+  AUD_CODEC_TYPE_AC3_LAYOUT_B   = 0xa,
+  AUD_CODEC_TYPE_OBA            = 0xb,
+};
+
 /*
 *@brief     set hdmi connect status via kcontrol
 *@param     isconnect: connect(true) or unconnect(false)
@@ -106,6 +121,11 @@ int aml_audio_set_drc_mode(enum audio_drc_mode mode);
 */
 int aml_audio_get_drc_mode();
 
+/*
+*@brief     get spdif format via kcontrol
+*@return    Return audio spdif format
+*/
+int aml_audio_get_spdif_format();
 
 #ifdef __cplusplus
 }
