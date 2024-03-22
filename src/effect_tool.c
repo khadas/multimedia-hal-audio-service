@@ -18,9 +18,11 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <Virtualx_v4.h>
 #include "audio_if_client.h"
 #include "audio_effect_if.h"
 #include "audio_effect_params.h"
+
 
 #ifdef LOG
 #undef LOG
@@ -175,6 +177,7 @@ Virtualx_param_t gVirtualxParam[] = {
     {{0, 4, 4}, AUDIO_DTS_ALL_PARAM_DUMP, {1}},
 };
 const char *VXStatusstr[] = {"Disable", "Enable"};
+
 
 //-------------function--------------------------
 static int Balance_effect_func(int gParamIndex, int gParamValue)
@@ -1331,12 +1334,47 @@ static int Virtualx_effect_func(int gParamIndex, int gParamValue, float gParamSc
     }
 }
 
+// -vx4 set param
+int Virtualx_v4_effect_func(void)
+{
+    VX_Cmd_Param *vxCmd = getVxCmdParamInstance();
+    if (!vxCmd) {
+        LOG("Warning, VxCmd is NULL!\n");
+        return -1;
+    }
+
+    //vxParam will update by init_effect_param_data()
+    Virtualx_v4_param_t *vxParam = getVxParamInstance();
+    int ret =audio_effect_set_parameters(AML_EFFECT_VIRTUALX_v4, &vxParam->param);//Set DTS VX parameters
+    LOG("rc is %d\n",ret);
+
+    if ((vxCmd->userId == PARAM_CHANNEL_NUM) ||
+        (vxCmd->userId == PARAM_OUT_CHANNEL_NUM) ||
+        (vxCmd->userId == VIRTUALX_PARAM_ENABLE) ||
+        (vxCmd->userId == VIRTUALX4_PARAM_SURROUND_MODE) ||
+        (vxCmd->userId == VIRTUALX4_PARAM_DIALOGCLARITY_MODE) ||
+        (vxCmd->userId == AUDIO_PARAM_TYPE_TRU_VOLUME) ||
+        (vxCmd->userId == PARAM_LOUDNESS_CONTROL_ENABLE_I32) ||
+        (vxCmd->userId == PARAM_LOUDNESS_CONTROL_IO_MODE_I32) ||
+        (vxCmd->userId == PARAM_AEQ_ENABLE_I32) ||
+        (vxCmd->userId == VIRTUALX_EFFECT_ENABLE))
+    {
+        LOG("->[%s] ParamIndex:%d ParamValType:Int %s = %d\n", (ret == 0? "OK" : "NG"), vxParam->command, vxCmd->param, vxParam->v);
+    }
+    else
+    {
+        LOG("->[%s] ParamIndex:%d ParamValType:CStr %s = %s\n", (ret == 0? "OK" : "NG"), vxParam->command, vxCmd->param, vxParam->str);
+    }
+    return 0;
+}
+
 int GetIntData (int *data)
 {
     int status = scanf("%d", data);
     if (status == 0) {
-        scanf("%*s");
-        LOG("Error input! Pls Retry!\n");
+        int status_temp=scanf("%*s");
+        if (status_temp < 0)
+            LOG("Error input! Pls Retry!\n");
         return -1;
     }
     return 0;
@@ -1631,6 +1669,7 @@ int main(int argc,char **argv)
             LOG("             3: Amlogic HPEQ\n");
             LOG("             4: Amlogic AVL\n");
             LOG("             5: DTS VIRTUALX\n");
+            LOG("             6: DTS VIRTUALX4\n");
             LOG("Usage: %s <EffectIndex>\n", argv[0]);
             LOG("******************************************************************************\n");
             return 0;
@@ -1730,6 +1769,13 @@ int main(int argc,char **argv)
             LOG("EffectIndex:%d, ParamIndex:%d, Paramvalue:%d\n", gEffectIndex, gParamIndex, gParamValue);
         }
         break;
+     case AML_EFFECT_VIRTUALX_v4:
+        ret = set_param_from_cmd_line(argc, argv);//Parse input parameter
+        if (ret < 0) {
+            LOG("main() Virtualx parse cmd line for VX Param fail!\n");
+        }
+        gParamIndex = ret;
+        break;;
     default:
         LOG("EffectIndex = %d is invalid\n", gEffectIndex);
         return -1;
@@ -1767,6 +1813,10 @@ int main(int argc,char **argv)
             if (Virtualx_effect_func(gParamIndex, gParamValue,gParamScale,grange) < 0)
                 LOG("Virtualx Test failed\n");
             break;
+       case AML_EFFECT_VIRTUALX_v4:
+            //------------set Virtualx v4 parameters-------------------------------------------
+            Virtualx_v4_effect_func();
+            break;
         default:
             break;
         }
@@ -1786,8 +1836,14 @@ int main(int argc,char **argv)
             break;
         }
 
-        if (GetIntData(&gParamIndex) < 0)
-            goto Retry_input;
+        /* AML_EFFECT_VIRTUALX_v4 gParamIndex support string
+         * so GetIntData not used at AML_EFFECT_VIRTUALX_v4
+         * use set_param_from_scanf () to parse the parameters of DTS V4
+        */
+        if (gEffectIndex != AML_EFFECT_VIRTUALX_v4) {
+            if (GetIntData(&gParamIndex) < 0)
+                goto Retry_input;
+        }
 
         switch (gEffectIndex) {
         case AML_EFFECT_BALANCE:
@@ -1850,6 +1906,15 @@ int main(int argc,char **argv)
                 LOG("EffectIndex:%d, ParamIndex:%d, Paramvalue:%d\n", gEffectIndex, gParamIndex, gParamValue);
             }
             break;
+        case AML_EFFECT_VIRTUALX_v4:
+            //------------get Virtualx parameters--------------------------------------
+            ret = set_param_from_scanf(AML_EFFECT_VIRTUALX_v4);
+            if (ret < 0) {
+                goto Retry_input;
+            }
+            gParamIndex = ret;
+            break;
+
         case AML_EFFECT_AVL:
             //------------get Avl parameters-------------------------------------------
             if (GetIntData(&gParamValue) < 0)
