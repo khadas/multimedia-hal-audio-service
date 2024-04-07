@@ -773,6 +773,7 @@ int aml_audio_get_volume()
 {
     pthread_mutex_lock(&g_volume_lock);
     int ret = 0;
+    chip_id = aml_audio_mixer_int(AML_CHIP_ID, 0, false);
     if (AML_CHIP_ID_S1A == chip_id)
         ret = aml_audio_mixer_int(TDMA_GAIN, 0, false);
     else
