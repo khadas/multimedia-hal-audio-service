@@ -80,6 +80,20 @@ aml_avl_param_t gAvlParam[] = {
 
 const char *AvlStatusstr[] = {"Disable", "Enable"};
 
+//----------DBX parameters-----------------------------
+aml_dbx_param_t gDbxParam[] = {
+    {{0, 4, 4}, DBX_PARAM_ENABLE, {1}},
+    {{0, 4, 4}, DBX_SET_MODE, {0}},
+    {{0, 4, 4}, DBX_Read_Param, {0}},
+    {{0, 4, 8}, DBX_Write_Param, {1}},
+    {{0, 4, 4}, DBX_Read_Coeff, {0}},
+    {{0, 4, 8}, DBX_Write_Coeff, {1}},
+    {{0, 4, 8}, DBX_Write_VCF, {1}},
+    {{0, 4, 4}, DBX_Mute, {0}},
+    {{0, 4, 4}, DBX_Version, {1}},
+};
+const char *DBXStatusstr[] = {"Disable", "Enable"};
+
 //-------------Virtualx parameter--------------------------
 Virtualx_param_t gVirtualxParam[] = {
     {{0, 4, 4}, DTS_PARAM_MBHL_ENABLE_I32, {1}},
@@ -287,6 +301,63 @@ static int TrebleBass_effect_func(int gParamIndex, int gParamValue)
     }
 }
 
+static int DBX_effect_func(int gParamIndex,int gParamDbxIndex, int gParamValue)
+{
+    switch (gParamIndex) {
+    case DBX_PARAM_ENABLE:
+        if (gParamValue < 0 || gParamValue > 1) {
+            LOG("DBX Status gParamValue = %d invalid\n", gParamValue);
+            return -1;
+        }
+        gDbxParam[gParamIndex].v = gParamDbxIndex;
+        audio_effect_set_parameters(AML_EFFECT_DBX, &gDbxParam[gParamIndex].param);
+        audio_effect_get_parameters(AML_EFFECT_DBX, &gDbxParam[gParamIndex].param);
+        LOG("DBX: state is %d -> %d\n", gParamValue, gDbxParam[gParamIndex].v);
+        return 0;
+    case DBX_SET_MODE:
+        if (gParamValue < 0 || gParamValue > 2) {
+            LOG("DBX Status gParamValue = %d invalid\n", gParamValue);
+            return -1;
+        }
+        gDbxParam[gParamIndex].v = gParamDbxIndex;
+        audio_effect_set_parameters(AML_EFFECT_DBX, &gDbxParam[gParamIndex].param);
+        LOG("DBX: set mode to %d\n",gDbxParam[gParamIndex].v);
+        return 0;
+    case DBX_Read_Param:
+    case DBX_Read_Coeff:
+        if (gParamDbxIndex < 0) {
+            LOG("DBX read DBX index %d invalid\n", gParamDbxIndex);
+            return -1;
+        }
+        gDbxParam[gParamIndex].v = gParamDbxIndex; //get dbx lib index
+        //value is printed at logcat
+        audio_effect_set_parameters(AML_EFFECT_DBX, &gDbxParam[gParamIndex].param);
+        return 0;
+
+    case DBX_Write_Param:
+    case DBX_Write_Coeff:
+    case DBX_Write_VCF:
+        if (gParamDbxIndex < 0) {
+            LOG("DBX write %d invalid\n",gParamIndex);
+                return -1;
+        }
+        gDbxParam[gParamIndex].value[0] = gParamDbxIndex; //set dbx param index
+        gDbxParam[gParamIndex].value[1] = gParamValue; //set dbx param value
+        audio_effect_set_parameters(AML_EFFECT_DBX, &gDbxParam[gParamIndex].param);
+        return 0;
+    case DBX_Mute:
+        //it will mute dbx output 500ms
+        audio_effect_set_parameters(AML_EFFECT_DBX, &gDbxParam[gParamIndex].param);
+        return 0;
+    case DBX_Version:
+        //it will print DBX version at logcat
+        audio_effect_set_parameters(AML_EFFECT_DBX, &gDbxParam[gParamIndex].param);
+        return 0;
+    default:
+        LOG("DBX: ParamIndex = %d invalid\n", gParamIndex);
+        return -1;
+    }
+}
 
 static int HPEQ_effect_func(int gParamIndex, int gParamValue, signed char gParamBand[5])
 {
@@ -1639,6 +1710,12 @@ void PrintHelp(int gEffectIndex, char *name)
         LOG("ParamIndex: %d -> Get all parameters from VX lib\n", (int)AUDIO_DTS_ALL_PARAM_DUMP);
         LOG("ParamValue: 0 \n");
         LOG("****************************************************************************\n\n");
+    } else if (gEffectIndex == AML_EFFECT_DBX) {
+        LOG("*********************************DBX****************************************\n");
+        LOG("Amlogic DBX EffectIndex: %d\n", (int)AML_EFFECT_DBX);
+        LOG("Usage: %s %d <ParamIndex> <ParamValue/ParamScale/gParamBand>\n", name, (int)AML_EFFECT_DBX);
+        LOG("ParamValue: 0 -> Disable   1 -> Enable\n");
+        LOG("****************************************************************************\n\n");
     }
 }
 
@@ -1651,6 +1728,7 @@ int main(int argc,char **argv)
     float gParamScale = 0.0f;
     float grange[VX_MAX_PARAM_SIZE] = {0};
     signed char gParamBand[5] = {0};
+    int gParamDBXIndex = 0;
     audio_hw_device_t *device;
 
     ret = audio_hw_load_interface(&device);
@@ -1670,6 +1748,7 @@ int main(int argc,char **argv)
             LOG("             4: Amlogic AVL\n");
             LOG("             5: DTS VIRTUALX\n");
             LOG("             6: DTS VIRTUALX4\n");
+            LOG("             7: DBX SOUND EFFECT\n");
             LOG("Usage: %s <EffectIndex>\n", argv[0]);
             LOG("******************************************************************************\n");
             return 0;
@@ -1776,6 +1855,22 @@ int main(int argc,char **argv)
         }
         gParamIndex = ret;
         break;;
+    case AML_EFFECT_DBX:
+        if (gParamIndex == DBX_Write_Param|| gParamIndex== DBX_Write_Coeff ||gParamIndex == DBX_Write_VCF) {
+            if (argc < 5) {
+                LOG("need 5 parameter,effect_tool EffectInde CommandIndex DBXindex DBXparam");
+                goto Retry_input;
+            } else {
+                sscanf(argv[3], "%d", &gParamDBXIndex);
+                sscanf(argv[4], "%d", &gParamValue);
+            }
+            LOG("DBX_EffectIndex:%d, ParamIndex:%d, gParamDBXIndex: %d, Paramvalue:%x\n", gEffectIndex, gParamIndex, gParamDBXIndex, gParamValue);
+        } else {
+            gParamValue = 0;
+            sscanf(argv[3], "%d", &gParamDBXIndex);
+            LOG("DBX_EffectIndex:%d, ParamIndex:%d, gParamDBXIndex:%d\n", gEffectIndex, gParamIndex, gParamDBXIndex);
+        }
+        break;
     default:
         LOG("EffectIndex = %d is invalid\n", gEffectIndex);
         return -1;
@@ -1816,6 +1911,11 @@ int main(int argc,char **argv)
        case AML_EFFECT_VIRTUALX_v4:
             //------------set Virtualx v4 parameters-------------------------------------------
             Virtualx_v4_effect_func();
+            break;
+       case AML_EFFECT_DBX:
+            //------------set DBX sound effect parameters--------------------------------------
+            if (DBX_effect_func(gParamIndex, gParamDBXIndex, gParamValue) < 0)
+                LOG("DBX Test failed\n");
             break;
         default:
             break;
@@ -1920,6 +2020,21 @@ int main(int argc,char **argv)
             if (GetIntData(&gParamValue) < 0)
                 goto Retry_input;
             LOG("EffectIndex:%d, ParamIndex:%d, Paramvalue:%d\n", gEffectIndex, gParamIndex, gParamValue);
+            break;
+        case AML_EFFECT_DBX:
+            //-----------get DBX parameters-------------------------------------------
+            if (gParamIndex == DBX_Write_Param|| gParamIndex== DBX_Write_Coeff ||gParamIndex == DBX_Write_VCF) {
+                if (GetIntData(&gParamDBXIndex) < 0)
+                    goto Retry_input;
+                if (GetIntData(&gParamValue) < 0)
+                    goto Retry_input;
+                LOG("DBX EffectIndex:%d, ParamIndex:%d, gParamDBXIndex: %d, Paramvalue:%x\n", gEffectIndex, gParamIndex, gParamDBXIndex, gParamValue);
+            } else {
+                if (GetIntData(&gParamDBXIndex) < 0)
+                    goto Retry_input;
+                gParamValue = 0;
+                LOG("DBX EffectIndex:%d, ParamIndex:%d, gParamDBXIndex:%d\n", gEffectIndex, gParamIndex, gParamDBXIndex);
+            }
             break;
         default:
             LOG("EffectIndex = %d is invalid\n", gEffectIndex);

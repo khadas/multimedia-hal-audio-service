@@ -215,6 +215,29 @@ typedef struct Virtualx_param_s {
         float params[VX_MAX_PARAM_SIZE];
     };
 } Virtualx_param_t;
+
+
+//-------------DBX typedef--------------------------
+typedef enum {
+    DBX_PARAM_ENABLE = 0,
+    DBX_SET_MODE     = 1,
+    DBX_Read_Param    = 2,
+    DBX_Write_Param   = 3,
+    DBX_Read_Coeff    = 4,
+    DBX_Write_Coeff   = 5,
+    DBX_Write_VCF     = 6,
+    DBX_Mute         = 7,
+    DBX_Version      = 8,
+} DBXparams;
+
+typedef struct aml_dbx_param_s {
+    effect_param_t param;
+    uint32_t command;
+    union {
+        int32_t v;
+        int32_t value[2];//index & value
+    };
+} aml_dbx_param_t;
 #ifdef __cplusplus
 }
 #endif
