@@ -1095,9 +1095,9 @@ int main(int argc, char** argv)
   if (r < 0)
     return r;
 
-  signal(SIGSEGV, handler);
-  signal(SIGABRT, handler);
-  signal(SIGFPE, handler);
+  //signal(SIGSEGV, handler);
+  //signal(SIGABRT, handler);
+  //signal(SIGFPE, handler);
 
   RunServer();
   return 0;
